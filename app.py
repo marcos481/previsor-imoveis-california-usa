@@ -70,7 +70,8 @@ if st.button("Calcular Preço Estimado"):
     dados_usuario = pd.DataFrame([[area_m2, quartos, vagas, latitude, longitude]], 
                                  columns=['area_m2', 'quartos', 'vagas', 'latitude', 'longitude'])
     resultado_ia = modelo.predict(dados_usuario)
-    preco_base = float(resultado_ia)
+    preco_base = float(resultado_ia[0])  # <--- ADICIONE O [0] AQUI!
+
     
     # 💎 CALIBRAÇÃO REGIONAL EM TEMPO REAL (Evita que bairros populares/comunidades fiquem abaixo do valor de custo)
     # Garante um valor mínimo realista por m² construído na região (Mínimo de R$ 3.800 a R$ 4.500/m²)
