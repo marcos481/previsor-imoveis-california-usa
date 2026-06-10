@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
-import joblib
+import xgboost as xgb # Trocamos joblib por xgboost nativo
 
-# 1. Carrega o modelo de IA de forma limpa
-modelo = joblib.load("modelo_final_xgboost.pkl")
+# 1. Carrega o modelo de forma nativa e ultra compatível (.json)
+modelo = xgb.XGBRegressor()
+modelo.load_model("modelo_final_xgboost.json")
 
 # 2. Configuração visual do site
 st.set_page_config(page_title="Previsor de Imóveis", page_icon="🏠", layout="centered")
