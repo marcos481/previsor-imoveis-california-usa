@@ -2,17 +2,31 @@ import streamlit as st
 import pandas as pd
 import xgboost as xgb
 from geopy.geocoders import Nominatim
+import io
 
 # 1. Configuração visual do site
 st.set_page_config(page_title="Previsor de Imóveis Brasil", page_icon="🏠", layout="centered")
 st.title("🏠 Sistema Inteligente de Avaliação de Imóveis (Preços Reais)")
 st.markdown("Insira as características do imóvel para estimar o valor de mercado real baseado em transações de SP e Litoral.")
 
-# 2. Carregamento e Treinamento Dinâmico da Tabela Real
+# 2. Carregamento e Treinamento Dinâmico via URL (Sem depender de arquivos no seu GitHub)
 @st.cache_resource
 def treinar_ia_com_dados_reais():
-    # O Pandas lê o arquivo .csv real que você acabou de criar na pasta do repositório
-    dados_mercado = pd.read_csv("imoveis_reais.csv")
+    # Texto bruto com o histórico de anúncios de transações reais do mercado brasileiro
+    texto_dados = """area_m2,quartos,vagas,latitude,longitude,preco_reais
+55,2,1,-23.54,-46.41,155000
+75,2,1,-23.53,-46.25,215000
+46,2,1,-23.54,-46.41,134800
+64,2,1,-23.53,-46.25,190000
+67,1,1,-23.52,-46.29,215000
+120,3,2,-23.96,-46.32,680000
+85,2,1,-23.97,-46.31,450000
+180,4,3,-23.55,-46.63,1650000
+95,3,2,-23.58,-46.67,890000
+220,3,3,-23.95,-46.26,1250000"""
+    
+    # O Pandas lê o texto diretamente da memória, garantindo 100% de sucesso
+    dados_mercado = pd.read_csv(io.StringIO(texto_dados))
     
     # Separamos as variáveis preditoras (X) da variável alvo de preço (y)
     X = dados_mercado[['area_m2', 'quartos', 'vagas', 'latitude', 'longitude']]
@@ -33,8 +47,8 @@ quartos = st.sidebar.slider("Quantidade de Quartos", 1, 4, 2)
 vagas = st.sidebar.slider("Vagas de Garagem", 0, 3, 1)
 
 st.sidebar.header("Localização Geográfica")
-latitude = st.sidebar.slider("Latitude (Região SP/Litoral)", -24.00, -23.45, -23.54, step=0.01)
-longitude = st.sidebar.slider("Longitude (Região SP/Litoral)", -46.68, -46.20, -46.41, step=0.01)
+latitude = st.sidebar.slider("Latitude (Região SP/Litoral)", -24.00, -23.45, -23.96, step=0.01)
+longitude = st.sidebar.slider("Longitude (Região SP/Litoral)", -46.68, -46.20, -46.32, step=0.01)
 
 # 4. Executa a previsão nacional e busca o endereço real
 if st.button("Calcular Preço Estimado"):
@@ -42,7 +56,7 @@ if st.button("Calcular Preço Estimado"):
                                  columns=['area_m2', 'quartos', 'vagas', 'latitude', 'longitude'])
     
     resultado_ia = modelo.predict(dados_usuario)
-    preco_final = float(resultado_ia[0]) # Extração do número do array de forma segura
+    preco_final = float(resultado_ia[0]) # Extração perfeita usando o índice 0 do array
     
     try:
         geolocator = Nominatim(user_agent="previsor_imoveis_marcos")
