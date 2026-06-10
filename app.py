@@ -61,7 +61,8 @@ if st.button("Calcular Preço Estimado"):
                                  columns=['area_m2', 'quartos', 'vagas', 'latitude', 'longitude'])
     
     resultado_ia = modelo.predict(dados_usuario)
-    preco_final = float(resultado_ia)
+    preco_final = float(resultado_ia[0])  # <--- ADICIONE O [0] AQUI!
+
     
     try:
         geolocator = Nominatim(user_agent="previsor_imoveis_marcos")
