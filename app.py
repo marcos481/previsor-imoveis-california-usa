@@ -77,7 +77,8 @@ if st.button("Calcular Preço Estimado"):
     )
 
     resultado_ia = modelo.predict(dados_usuario)
-    preco_final = float(resultado_ia)
+    preco_final = float(resultado_ia[0])  # <--- ADICIONE O [0] AQUI!
+
 
     # Exibição do resultado final formatado na moeda nacional (R$)
     st.success(f"### Valor Estimado do Imóvel: R$ {preco_final:,.2f}")
