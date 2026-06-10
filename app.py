@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-import xgboost as xgb # Trocamos joblib por xgboost nativo
+import xgboost as xgb
 
-# 1. Carrega o modelo de forma nativa e ultra compatível (.json)
+# 1. Carrega o modelo usando o desserializador nativo do XGBoost para arquivos .pkl
 modelo = xgb.XGBRegressor()
-modelo.load_model("modelo_final_xgboost.json")
+modelo.load_model("modelo_final_xgboost.pkl")
 
 # 2. Configuração visual do site
 st.set_page_config(page_title="Previsor de Imóveis", page_icon="🏠", layout="centered")
@@ -26,7 +26,7 @@ if st.button("Calcular Preço Estimado"):
                                  columns=['longitude', 'latitude', 'total_rooms', 'housing_median_age', 'median_income'])
     
     resultado_ia = modelo.predict(dados_usuario)
-    preco_final = float(resultado_ia[0])
+    preco_final = float(resultado_ia[0]) # Garante o primeiro valor da lista
     
     st.success(f"### Valor Estimado do Imóvel: R$ {preco_final:,.2f}")
     st.info("Nota: Modelo operando com margem de precisão de 15.5%.")
