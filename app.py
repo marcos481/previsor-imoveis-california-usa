@@ -54,7 +54,8 @@ if st.button("Calcular Preço Estimado"):
                                  columns=['area_m2', 'quartos', 'vagas', 'latitude', 'longitude'])
     
     resultado_ia = modelo.predict(dados_usuario)
-    preco_final = float(resultado_ia)
+    preco_final = float(resultado_ia[0])  # <--- ADICIONE O [0] AQUI PARA EXTRAIR O NÚMERO
+
     
     # 🌍 MÁGICA GEOGRÁFICA: Buscando a rua e a cidade real pelas coordenadas
     try:
