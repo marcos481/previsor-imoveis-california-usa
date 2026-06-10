@@ -44,7 +44,8 @@ if st.button("Calcular Preço Estimado"):
                                  columns=['longitude', 'latitude', 'total_rooms', 'housing_median_age', 'median_income'])
     
     resultado_ia = modelo.predict(dados_usuario)
-    preco_final = float(resultado_ia)
+   preco_final = float(resultado_ia[0])  # <--- ADICIONE O [0] AQUI!
+
     
     st.success(f"### Valor Estimado do Imóvel: R$ {preco_final:,.2f}")
     st.info("Nota: Modelo operando com estabilidade via carregamento local.")
