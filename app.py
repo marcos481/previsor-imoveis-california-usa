@@ -72,7 +72,6 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         texto_limpo = endereco_digitado.replace('-', '').replace(' ', '').strip()
         
         if texto_limpo.isdigit() and len(texto_limpo) == 8:
-            # Se for CEP, faz a busca estruturada no ViaCEP para garantir o endereço correto
             try:
                 url_cep = f"https://viacep.com.br{texto_limpo}/json/"
                 res_cep = requests.get(url_cep, timeout=5).json()
@@ -85,17 +84,15 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
 
         # Passo 2: Motor Geocodificador de Alta Precisão (Transforma texto do endereço em Latitude/Longitude reais)
         try:
-            # Formatamos a query para buscar estritamente no Brasil e evitar distorções de mapas internacionais
             url_geo = f"https://maps.co{endereco_completo}, Brasil"
             res_geo = requests.get(url_geo, timeout=5).json()
             if isinstance(res_geo, list) and len(res_geo) > 0:
                 latitude = float(res_geo[0]['lat'])
                 longitude = float(res_geo[0]['lon'])
         except:
-            # Fallback secundário usando API pública caso a primeira apresente lentidão
             try:
                 url_nominatim = f"https://openstreetmap.org{endereco_completo}, Brasil"
-                headers = {'User-Agent': 'previsor_imobiliario_marcos_v7'}
+                headers = {'User-Agent': 'previsor_imobiliario_marcos_v8'}
                 res_nom = requests.get(url_nominatim, headers=headers, timeout=5).json()
                 if len(res_nom) > 0:
                     latitude = float(res_nom[0]['lat'])
@@ -117,10 +114,10 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR (Utilizando )
+        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR (Utilizando)
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao)  # Blindagem do array do XGBoost
+        proporcao_ia = float(resultado_predicao[0])  # <--- SOLUÇÃO DEFINITIVA DO TYPEERROR
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -138,7 +135,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         
         st.info(f"📍 **Endereço Formatado Localizado:** {endereco_completo}")
         
-        # 🗺️ RENDERIZADOR DE MAPA ATUALIZADO (Com as coordenadas exatas convertidas da rua)
+        # 🗺️ RENDERIZADOR DE MAPA ATUALIZADO
         st.subheader("🗺️ Localização Geográfica do Imóvel")
         df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_mapa, zoom=15)
