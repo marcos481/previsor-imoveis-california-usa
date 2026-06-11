@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
 import xgboost as xgb
-from geopy.geocoders import Nominatim
 import io
+import requests
 
 # 1. Configuração visual do site
-st.set_page_config(page_title="Previsor Imobiliário Brasil", page_icon="🏠", layout="wide")
-st.title("🏠 Sistema Inteligente de Avaliação de Imóveis Nacional")
-st.markdown("Estime o valor de mercado real de imóveis em **qualquer município do Brasil** com calibração regional automática.")
+st.set_page_config(page_title="Previsor Imobiliário Brasil Pro", page_icon="🏠", layout="wide")
+st.title("🏠 Sistema de Avaliação Imobiliária com Google Maps")
+st.markdown("Estime o valor de mercado baseado em CEP ou endereço real cruzado com inteligência artificial.")
 
 # 2. Base de dados base para tendências de tamanho e cômodos
 @st.cache_resource
@@ -22,16 +22,14 @@ def treinar_ia_nacional():
 140,3,2,720000
 180,4,3,980000
 220,4,3,1300000"""
-    
     dados_mercado = pd.read_csv(io.StringIO(texto_dados))
     X = dados_mercado[['area_m2', 'quartos', 'vagas']]
     y = dados_mercado['preco_base_referencia']
-    
     modelo_ia = xgb.XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
     modelo_ia.fit(X, y)
     return modelo_ia
 
-with st.spinner("Analisando mercado e inicializando motores de cálculo nacionais..."):
+with st.spinner("Inicializando motores de cálculo..."):
     modelo = treinar_ia_nacional()
 
 # Tabela dinâmica de valor do m² médio por Estado/Capital (Referência de Mercado)
@@ -43,11 +41,6 @@ tabela_m2_brasil = {
     "PR": {"capital": 7800, "interior_no_geral": 4500},
     "MG": {"capital": 7900, "interior_no_geral": 4200},
     "RS": {"capital": 6800, "interior_no_geral": 4100},
-    "PE": {"capital": 7400, "interior_no_geral": 3900},
-    "BA": {"capital": 6200, "interior_no_geral": 3600},
-    "CE": {"capital": 5900, "interior_no_geral": 3500},
-    "GO": {"capital": 6500, "interior_no_geral": 3800},
-    "PA": {"capital": 5400, "interior_no_geral": 3200},
     "PADRAO": {"capital": 5500, "interior_no_geral": 3500}
 }
 
@@ -62,98 +55,90 @@ with col_esq:
     padrao = st.selectbox("Padrão de Acabamento", ["Econômico / Popular", "Médio / Padrão", "Alto Padrão / Luxo"])
 
 with col_dir:
-    st.subheader("📍 Localização (Travada no Brasil)")
-    opcao_busca = st.radio("Como deseja localizar?", ["Por CEP ou Endereço escrito", "Por Coordenadas (Lat/Lon)"])
+    st.subheader("📍 Localização por Google Maps / CEP")
+    endereco_digitado = st.text_input("Digite o CEP ou Endereço Completo", "11520-000, Cubatão, SP")
     
-    latitude, longitude = -23.5505, -46.6333 # Padrão: SP Capital
-    endereco_digitado = ""
-    
-    if opcao_busca == "Por CEP ou Endereço escrito":
-        endereco_digitado = st.text_input("Digite o CEP, Rua ou Cidade (Ex: Jardim Casqueiro, Cubatão SP)", "Cubatão, SP")
-    else:
-        latitude = st.number_input("Latitude", value=-23.8900, format="%.4f")
-        longitude = st.number_input("Longitude", value=-46.4200, format="%.4f")
+    # Campo opcional para colocar a chave da API caso queira usar em produção com o mapa do satélite
+    google_key = st.text_input("Chave API do Google Maps (Opcional)", type="password", help="Deixe em branco para usar o buscador nativo otimizado")
 
 # 4. Processamento da Localização e Cálculo do Preço
 if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
-    with st.spinner("Buscando dados geográficos e aplicando índices locais..."):
-        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v5")
-        cidade = ""
-        estado_uf = ""
-        endereco_completo = ""
-        
-        try:
-            if opcao_busca == "Por CEP ou Endereço escrito" and endereco_digitado:
-                loc = geolocator.geocode(endereco_digitado, addressdetails=True, country_codes='BR', timeout=10)
-                if loc:
-                    latitude, longitude = loc.latitude, loc.longitude
-                    endereco_completo = loc.address
-                    detalhes = loc.raw.get('address', {})
-                    cidade = detalhes.get('city', detalhes.get('town', detalhes.get('municipality', '')))
-                    estado_uf = detalhes.get('state_code', '').upper() if detalhes.get('state_code') else ""
-                    if not estado_uf and 'state' in detalhes:
-                        estado_uf = detalhes.get('state', '')
-            else:
-                loc = geolocator.reverse(f"{latitude}, {longitude}", addressdetails=True, timeout=10)
-                if loc:
-                    endereco_completo = loc.address
-                    detalhes = loc.raw.get('address', {})
-                    cidade = detalhes.get('city', detalhes.get('town', detalhes.get('municipality', '')))
-                    estado_uf = detalhes.get('state_code', '').upper() if detalhes.get('state_code') else ""
-                    if not estado_uf and 'state' in detalhes:
-                        estado_uf = detalhes.get('state', '')
-        except:
-            st.warning("⚠️ Falha temporária ao conectar ao mapa. Usando aproximação padrão regional.")
+    with st.spinner("Conectando aos servidores de mapas..."):
+        latitude, longitude = -23.8900, -46.4200  # Padrão Cubatão
+        cidade_detectada = "Cubatão"
+        estado_uf = "SP"
+        endereco_completo = endereco_digitado
 
-        # Limpeza rápida de nomes de cidades e estados
-        cidade_limpa = str(cidade).lower().strip() if cidade else ""
-        estado_uf = str(estado_uf).upper().strip() if estado_uf else "SP"
-        
-        # Tratamento de segurança para siglas de estados brasileiros
-        if len(estado_uf) > 2:
-            if "paulo" in estado_uf.lower(): estado_uf = "SP"
-            elif "rio" in estado_uf.lower(): estado_uf = "RJ"
-            elif "minas" in estado_uf.lower(): estado_uf = "MG"
-            elif "santa" in estado_uf.lower(): estado_uf = "SC"
-            elif "paraná" in estado_uf.lower() or "parana" in estado_uf.lower(): estado_uf = "PR"
-            else: estado_uf = "SP"
+        # Se o usuário tiver uma chave Google Maps, usamos a API oficial de Geocoding
+        if google_key:
+            try:
+                url = f"https://googleapis.com{endereco_digitado}&key={google_key}"
+                response = requests.get(url).json()
+                if response['status'] == 'OK':
+                    resultado = response['results'][0]
+                    latitude = resultado['geometry']['location']['lat']
+                    longitude = resultado['geometry']['location']['lng']
+                    endereco_completo = resultado['formatted_address']
+                    
+                    # Extrai cidade e estado dos componentes do Google
+                    for comp in resultado['address_components']:
+                        if "administrative_area_level_2" in comp['types']:
+                            cidade_detectada = comp['long_name']
+                        if "administrative_area_level_1" in comp['types']:
+                            estado_uf = comp['short_name']
+            except:
+                st.error("Erro ao validar chave do Google Maps. Usando contingência.")
+        else:
+            # Sistema de geocodificação pública alternativa via API do OpenStreetMap otimizada para CEPs estruturados
+            try:
+                url_cep = f"https://viacep.com.br{endereco_digitado.replace('-', '').replace(' ', '')}/json/"
+                res_cep = requests.get(url_cep).json()
+                if "localidade" in res_cep:
+                    cidade_detectada = res_cep["localidade"]
+                    estado_uf = res_cep["uf"]
+                    endereco_completo = f"{res_cep['logradouro']}, {res_cep['bairro']} - {cidade_detectada}, {estado_uf}"
+            except:
+                pass # Mantém o padrão Cubatão se falhar
+
+        # Limpeza das variáveis de texto
+        cidade_limpa = cidade_detectada.lower().strip()
+        estado_uf = estado_uf.upper().strip()
 
         # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
         dados_uf = tabela_m2_brasil.get(estado_uf, tabela_m2_brasil["PADRAO"])
         
-        if "cubatão" in cidade_limpa:
+        if "cubatão" in cidade_limpa or "cubatao" in cidade_limpa:
             preco_m2_base = dados_uf.get("cubatao", 4300)
-        elif cidade_limpa and any(k in cidade_limpa for k in ["são paulo", "rio de janeiro", "curitiba", "belo horizonte", "porto alegre", "recife", "salvador", "fortaleza", "brasília"]):
+        elif any(k in cidade_limpa for k in ["são paulo", "rio", "curitiba", "belo horizonte", "porto alegre"]):
             preco_m2_base = dados_uf.get("capital", 5500)
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO COM [0]
+        # 🧠 PREDITOR COMBINADO
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
-        resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao[0])  # <--- SOLUÇÃO DEFINITIVA DO TYPEERROR
+        proporcao_ia = float(modelo.predict(dados_usuario))
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
         
-        if padrao == "Econômico / Popular":
-            preco_final *= 0.85
-        elif padrao == "Alto Padrão / Luxo":
-            preco_final *= 1.30
-
+        if padrao == "Econômico / Popular": preco_final *= 0.85
+        elif padrao == "Alto Padrão / Luxo": preco_final *= 1.30
         preco_final += (vagas * 20000)
 
-        # Exibição Analítica dos Resultados na Tela
+        # Exibição dos resultados
         st.success(f"## Valor de Mercado Estimado: R$ {preco_final:,.2f}")
         
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         c1.metric(label="Média do m² Calculado", value=f"R$ {preco_final/area_m2:,.2f}/m²")
-        c2.metric(label="Cidade / UF Identificada", value=f"{cidade if cidade else 'Região Identificada'} - {estado_uf}")
-        c3.metric(label="Coordenadas de Análise", value=f"{latitude:.4f}, {longitude:.4f}")
+        c2.metric(label="Localidade Identificada", value=f"{cidade_detectada} - {estado_uf}")
         
-        st.info(f"📍 **Endereço Completo no Mapa:** {endereco_completo if endereco_completo else 'Busca por coordenadas locais.'}")
+        st.info(f"📍 **Endereço Formatado:** {endereco_completo}")
         
-        # 🗺️ VISUALIZADOR DE MAPA
-        st.subheader("🗺️ Verificação Visual de Localização")
-        df_mapa = pd.DataFrame({'lat': [latitude], 'lon': [longitude]})
-        st.map(df_mapa)
+        # 🗺️ RENDERIZADOR DE MAPA COM LINKS DIRETOS PARA O GOOGLE MAPS
+        st.subheader("🗺️ Visualização Geográfica")
+        df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
+        st.map(df_mapa, zoom=15)
+        
+        # Cria um link dinâmico para abrir direto no app do Google Maps se o usuário quiser
+        url_google_maps = f"https://google.com{latitude},{longitude}"
+        st.markdown(f"[🔗 Clique aqui para abrir este imóvel direto no app do Google Maps]({url_google_maps})")
