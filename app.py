@@ -4,14 +4,40 @@ import requests
 import urllib.parse
 
 # 1. Configuração visual do site
-st.set_page_config(page_title="Previsor Imobiliário Pro", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="Previsor Imobiliário Brasil Pro", page_icon="🏠", layout="wide")
 st.title("🏠 Sistema Profissional de Avaliação Imobiliária (Google Maps API)")
-st.markdown("Estime o valor de mercado real cruzando dados físicos com a infraestrutura oficial do Google.")
+st.markdown("Estime o valor de mercado real cruzando dados físicos com a infraestrutura oficial do Google em todo o território nacional.")
 
-# Tabela dinâmica nacional de valor do m² médio por Estado (Mercado Real)
+# 🗺️ TABELA COMPLETA NACIONAL: Cobertura de todas as 27 Unidades Federativas do Brasil
+# Valores de m² calibrados de acordo com os índices médios de mercado regionais
 tabela_m2_nacional = {
-    "SP": {"capital": 10200, "interior": 5400, "guaruja": 5400, "cubatao": 3600},
+    "AC": {"capital": 5100, "interior": 3400},
+    "AL": {"capital": 6500, "interior": 3800},
+    "AM": {"capital": 6900, "interior": 3900},
+    "AP": {"capital": 4800, "interior": 3200},
+    "BA": {"capital": 6200, "interior": 3600},
+    "CE": {"capital": 5900, "interior": 3500},
+    "DF": {"capital": 8900, "interior": 5200}, # Brasília e Regiões Administrativas
+    "ES": {"capital": 7400, "interior": 4500},
+    "GO": {"capital": 6500, "interior": 3800},
+    "MA": {"capital": 5300, "interior": 3300},
+    "MG": {"capital": 7900, "interior": 4200},
+    "MS": {"capital": 5800, "interior": 3600},
+    "MT": {"capital": 6200, "interior": 3900},
+    "PA": {"capital": 5400, "interior": 3200},
+    "PB": {"capital": 5700, "interior": 3400},
+    "PE": {"capital": 7400, "interior": 3900},
+    "PI": {"capital": 5100, "interior": 3300},
+    "PR": {"capital": 7800, "interior": 4500},
     "RJ": {"capital": 10100, "interior": 4800},
+    "RN": {"capital": 5800, "interior": 3500},
+    "RO": {"capital": 5200, "interior": 3400},
+    "RR": {"capital": 4700, "interior": 3100},
+    "RS": {"capital": 6800, "interior": 4100},
+    "SC": {"capital": 11000, "interior": 6500},
+    "SE": {"capital": 5500, "interior": 3400},
+    "SP": {"capital": 10200, "interior": 5400, "guaruja": 5400, "cubatao": 3600}, # Microrregiões paulistas salvas
+    "TO": {"capital": 5300, "interior": 3400},
     "PADRAO": {"capital": 5500, "interior": 3500}
 }
 
@@ -24,7 +50,7 @@ google_api_key = st.sidebar.text_input(
 )
 
 if not google_api_key:
-    st.sidebar.warning("⚠️ Modo de Contingência Ativo: Insira a chave do Google para liberar o mapa por lote.")
+    st.sidebar.warning("⚠️ Modo de Contingência Ativo: Insira a chave do Google para liberar o mapa oficial por lote.")
 
 # Interface de entrada em colunas
 col_esq, col_dir = st.columns(2)
@@ -55,7 +81,7 @@ if st.button("🚀 Calcular Avaliação Profissional"):
         endereco_oficial = "Região de Cubatão, SP"
         latitude, longitude = -23.8920, -46.4250
 
-    # 🌐 SE A CHAVE EXISTIR: O Google assume o controle absoluto da localização
+    # 🌐 SE A CHAVE EXISTIR: O Google assume o controle absoluto da localização e descobre a UF real
     if google_api_key:
         with st.spinner("Consultando servidores do Google Geocoding..."):
             try:
@@ -64,7 +90,7 @@ if st.button("🚀 Calcular Avaliação Profissional"):
                 response = requests.get(url_google, timeout=8).json()
                 
                 if response['status'] == 'OK':
-                    resultado = response['results'][0]
+                    resultado = response['results']
                     latitude = float(resultado['geometry']['location']['lat'])
                     longitude = float(resultado['geometry']['location']['lng'])
                     endereco_oficial = resultado['formatted_address']
@@ -74,26 +100,30 @@ if st.button("🚀 Calcular Avaliação Profissional"):
                         if "administrative_area_level_2" in comp['types']:
                             cidade_detectada = comp['long_name']
                         if "administrative_area_level_1" in comp['types']:
-                            estado_uf = comp['short_name']
+                            estado_uf = comp['short_name'].upper().strip()
                 else:
                     st.error(f"Erro na API do Google: {response['status']}. Verifique as permissões da sua chave.")
             except:
                 st.error("Falha de comunicação com o servidor do Google Maps.")
 
-    # 💎 PREÇO DO M² PONDERADO REGIONAL
+    # 💎 PREÇO DO M² PONDERADO REGIONAL DINÂMICO NACIONAL
     cidade_limpa = cidade_detectada.lower().strip()
+    
+    # Busca a sub-tabela do estado retornado pelo Google (Ex: "RJ", "MG", "SC")
     sub_tabela = tabela_m2_nacional.get(estado_uf, tabela_m2_nacional["PADRAO"])
     
-    if "guaruja" in cidade_limpa or "guarujá" in cidade_limpa:
+    # Regras específicas para cidades paulistas salvas
+    if estado_uf == "SP" and ("guaruja" in cidade_limpa or "guarujá" in cidade_limpa):
         preco_m2_base = sub_tabela.get("guaruja", 5400)
-    elif "cubatão" in cidade_limpa or "cubatao" in cidade_limpa:
+    elif estado_uf == "SP" and ("cubatão" in cidade_limpa or "cubatao" in cidade_limpa):
         preco_m2_base = sub_tabela.get("cubatao", 3600)
-    elif any(k in cidade_limpa for k in ["são paulo", "rio"]):
+    # Lógica nacional geral: se o nome da cidade conter o termo da própria capital ou se for região metropolitana polo
+    elif any(k in cidade_limpa for k in ["são paulo", "rio", "belo horizonte", "curitiba", "porto alegre", "brasília", "recife", "salvador", "fortaleza", "goiânia", "manaus"]):
         preco_m2_base = sub_tabela.get("capital")
     else:
         preco_m2_base = sub_tabela.get("interior")
 
-    # Cálculo final
+    # Cálculo final de avaliação comercial estruturada
     valor_base_estrutura = (area_m2 * preco_m2_base) + (quartos * 8000) + (vagas * 12000)
     if padrao == "Econômico / Popular": valor_base_estrutura *= 0.82
     elif padrao == "Alto Padrão / Luxo": valor_base_estrutura *= 1.22
@@ -107,19 +137,16 @@ if st.button("🚀 Calcular Avaliação Profissional"):
     c2.metric(label="Localidade Validada", value=f"{cidade_detectada} - {estado_uf}")
     st.info(f"📍 **Endereço Confirmado:** {endereco_oficial}")
     
-    # 🗺️ VISUALIZADOR DE MAPA PROFISSIONAL
+    # 🗺️ VISUALIZADOR DE MAPA PROFISSIONAL COM SELEÇÃO INTELIGENTE
     st.subheader("🗺️ Localização Geográfica")
     if google_api_key:
-        # Se tem a chave, exibe o mapa interativo dinâmico oficial do Google via Embed
         endereco_mapa_encoded = urllib.parse.quote(endereco_oficial)
         embed_url = f"https://google.com{google_api_key}&q={endereco_mapa_encoded}&zoom=16"
         st.components.v1.iframe(embed_url, width=1100, height=400, scrolling=False)
     else:
-        # Modo de segurança sem a chave (Apenas coordenadas em tabela e aviso)
-        st.warning("Insira a sua API Key do Google Maps no menu lateral para visualizar o mapa interativo neste bloco.")
         df_contingencia = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
-        st.dataframe(df_mapa_contingencia)
+        st.map(df_contingencia, zoom=14)
 
-    # 🔗 LINK DE DIRECIONAMENTO EXTERNO (Sempre ativo e funcional)
+    # 🔗 LINK DE DIRECIONAMENTO EXTERNO (Universal)
     url_final_google = f"https://google.com{latitude},{longitude}"
-    st.link_button("➡️ Abrir Rota Direta no Aplicativo do Google Maps", url_final_google, type="primary")
+    st.link_button("➡️ Abrir Rota Direta no Aplicativo do Google Maps", url_google_maps_oficial if 'url_google_maps_oficial' in locals() else url_final_google, type="primary")
