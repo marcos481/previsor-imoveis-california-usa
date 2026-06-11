@@ -5,120 +5,155 @@ from geopy.geocoders import Nominatim
 import io
 
 # 1. Configuração visual do site
-st.set_page_config(page_title="Previsor de Imóveis SP & Litoral", page_icon="🏠", layout="centered")
-st.title("🏠 Sistema Inteligente de Avaliação de Imóveis (Preços Praticados)")
-st.markdown("Insira as características do imóvel para estimar o valor de mercado real baseado em transações de SP e Litoral.")
+st.set_page_config(page_title="Previsor Imobiliário Brasil", page_icon="🏠", layout="wide")
+st.title("🏠 Sistema Inteligente de Avaliação de Imóveis Nacional")
+st.markdown("Estime o valor de mercado real de imóveis em **qualquer município do Brasil** com calibração regional automática.")
 
-# 2. Base de dados inteligente calibrada com valores de m² reais de mercado
+# 2. Base de dados base para tendências de tamanho e cômodos
 @st.cache_resource
-def treinar_ia_com_dados_reais():
-    # Base de dados limpa e expandida para criar a tendência do modelo
-    texto_dados = """area_m2,quartos,vagas,latitude,longitude,preco_reais
-50,1,0,-23.99,-46.42,240000
-65,2,1,-23.98,-46.43,320000
-40,1,0,-23.97,-46.25,270000
-55,1,0,-23.96,-46.40,290000
-80,2,1,-23.96,-46.33,720000
-120,3,2,-23.97,-46.31,1180000
-150,3,2,-23.98,-46.30,1750000
-90,2,1,-23.95,-46.26,740000
-110,3,2,-23.96,-46.25,1020000
-220,3,3,-23.95,-46.26,2450000
-45,1,0,-23.54,-46.64,360000
-75,2,1,-23.56,-46.68,680000
-60,2,1,-23.59,-46.63,590000
-110,3,2,-23.55,-46.66,1150000
-140,3,2,-23.58,-46.67,1620000
-46,2,1,-23.54,-46.41,340000
-64,2,1,-23.53,-46.45,430000
-67,1,1,-23.52,-46.59,490000
-180,4,3,-23.55,-46.63,2100000
-95,3,2,-23.58,-46.67,1180000
-55,2,1,-23.96,-46.38,360000
-70,2,1,-23.97,-46.36,460000
-85,2,1,-24.00,-46.41,390000
-130,3,2,-23.99,-46.25,1100000"""
+def treinar_ia_nacional():
+    # Dataset genérico que ensina ao XGBoost o impacto proporcional de m², quartos e vagas
+    texto_dados = """area_m2,quartos,vagas,preco_base_referencia
+40,1,0,160000
+50,1,1,210000
+65,2,1,280000
+80,2,1,360000
+90,2,2,420000
+110,3,2,550000
+140,3,2,720000
+180,4,3,980000
+220,4,3,1300000"""
     
     dados_mercado = pd.read_csv(io.StringIO(texto_dados))
-    X = dados_mercado[['area_m2', 'quartos', 'vagas', 'latitude', 'longitude']]
-    y = dados_mercado['preco_reais']
+    X = dados_mercado[['area_m2', 'quartos', 'vagas']]
+    y = dados_mercado['preco_base_referencia']
     
-    modelo_ia = xgb.XGBRegressor(
-        n_estimators=80, 
-        learning_rate=0.05, 
-        max_depth=3, 
-        random_state=42
-    )
+    modelo_ia = xgb.XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
     modelo_ia.fit(X, y)
     return modelo_ia
 
-with st.spinner("Calibrando preços com o histórico do mercado real paulista..."):
-    modelo = treinar_ia_com_dados_reais()
+with st.spinner("Inicializando motores de cálculo nacionais..."):
+    modelo = treinar_ia_nacional()
 
-# 3. Criação dos controles visuais na barra lateral
-st.sidebar.header("Características do Imóvel")
-area_m2 = st.sidebar.slider("Área Privativa (m²)", 40, 250, 70)
-quartos = st.sidebar.slider("Quantidade de Quartos", 1, 4, 2)
-vagas = st.sidebar.slider("Vagas de Garagem", 0, 3, 1)
+# Tabela dinâmica de valor do m² médio por Estado/Capital (Referência de Mercado)
+# Valores calibrados para a realidade de mercado refletindo variações regionais
+tabela_m2_brasil = {
+    "SP": {"capital": 10200, "interior_no_geral": 5400, "cubatao": 4300},
+    "RJ": {"capital": 10100, "interior_no_geral": 4800},
+    "DF": {"capital": 8900, "interior_no_geral": 5200},
+    "SC": {"capital": 11000, "interior_no_geral": 6500}, # Balneário Camboriú / Itapema puxam para cima
+    "PR": {"capital": 7800, "interior_no_geral": 4500},
+    "MG": {"capital": 7900, "interior_no_geral": 4200},
+    "RS": {"capital": 6800, "interior_no_geral": 4100},
+    "PE": {"capital": 7400, "interior_no_geral": 3900},
+    "BA": {"capital": 6200, "interior_no_geral": 3600},
+    "CE": {"capital": 5900, "interior_no_geral": 3500},
+    "GO": {"capital": 6500, "interior_no_geral": 3800},
+    "PA": {"capital": 5400, "interior_no_geral": 3200},
+    "PADRAO": {"capital": 5500, "interior_no_geral": 3500}
+}
 
-st.sidebar.header("Localização Geográfica")
-# Limites estendidos para cobrir Cubatão, Santos, São Vicente e SP Capital de forma segura
-latitude = st.sidebar.slider("Latitude (Região SP/Litoral)", -24.10, -23.40, -23.89, step=0.01)
-longitude = st.sidebar.slider("Longitude (Região SP/Litoral)", -46.75, -46.15, -46.42, step=0.01)
+# 3. Interface em colunas
+col_esq, col_dir = st.columns([1, 1])
 
-# 4. Executa a previsão e aplica a calibração por cidade real
-if st.button("Calcular Preço Estimado"):
-    bairro_detectado = ""
-    cidade_detectada = ""
-    endereco_completo = ""
+with col_esq:
+    st.subheader("📐 Características do Imóvel")
+    area_m2 = st.slider("Área Privativa (m²)", 30, 400, 70)
+    quartos = st.slider("Quantidade de Quartos", 1, 5, 2)
+    vagas = st.slider("Vagas de Garagem", 0, 4, 1)
+    padrao = st.selectbox("Padrão de Acabamento", ["Econômico / Popular", "Médio / Padrão", "Alto Padrão / Luxo"])
+
+with col_dir:
+    st.subheader("📍 Localização (Escolha uma opção)")
+    opcao_busca = st.radio("Como deseja localizar?", ["Por CEP ou Endereço escrito", "Por Coordenadas (Lat/Lon)"])
     
-    try:
-        geolocator = Nominatim(user_agent="previsor_imoveis_marcos_v3")
-        localizacao = geolocator.reverse(f"{latitude}, {longitude}", timeout=10)
-        endereco_completo = localizacao.address
+    latitude, longitude = -23.5505, -46.6333 # Padrão: SP Capital
+    endereco_digitado = ""
+    
+    if opcao_busca == "Por CEP ou Endereço escrito":
+        endereco_digitado = st.text_input("Digite o CEP, Rua ou Cidade (Ex: Jardim Casqueiro, Cubatão SP)", "Cubatão, SP")
+    else:
+        latitude = st.number_input("Latitude", value=-23.890, format="%.4f")
+        longitude = st.number_input("Longitude", value=-46.420, format="%.4f")
+
+# 4. Processamento da Localização e Cálculo do Preço
+if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
+    with st.spinner("Buscando dados geográficos e aplicando índices locais..."):
+        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v1")
+        cidade = ""
+        estado_uf = ""
+        endereco_completo = ""
         
-        detalhes_endereco = localizacao.raw.get('address', {})
-        bairro_detectado = detalhes_endereco.get('suburb', '')
-        # Detecta cidade ou município de forma precisa
-        cidade_detectada = detalhes_endereco.get('city', detalhes_endereco.get('town', detalhes_endereco.get('municipality', ''))).strip()
-    except:
-        endereco_completo = "Endereço localizado por coordenadas na Baixada Santista / SP."
+        # Resolve a localização independente da escolha do usuário
+        try:
+            if opcao_busca == "Por CEP ou Endereço escrito" and endereco_digitado:
+                loc = geolocator.geocode(endereco_digitado, addressdetails=True, timeout=10)
+                if loc:
+                    latitude, longitude = loc.latitude, loc.longitude
+                    endereco_completo = loc.address
+                    detalhes = loc.raw.get('address', {})
+                    cidade = detalhes.get('city', detalhes.get('town', detalhes.get('municipality', '')))
+                    estado_uf = detalhes.get('state_code', '').upper()
+                    if not estado_uf and 'state' in detalhes:
+                        # Fallback se não vier a sigla direta
+                        estado_uf = detalhes.get('state', '')
+            else:
+                loc = geolocator.reverse(f"{latitude}, {longitude}", addressdetails=True, timeout=10)
+                if loc:
+                    endereco_completo = loc.address
+                    detalhes = loc.raw.get('address', {})
+                    cidade = detalhes.get('city', detalhes.get('town', detalhes.get('municipality', '')))
+                    estado_uf = detalhes.get('state_code', '').upper()
+        except:
+            st.warning("⚠️ Falha temporária ao conectar ao mapa. Usando aproximação padrão regional.")
 
-    # Executa a previsão matemática base do XGBoost
-    dados_usuario = pd.DataFrame([[area_m2, quartos, vagas, latitude, longitude]], 
-                                 columns=['area_m2', 'quartos', 'vagas', 'latitude', 'longitude'])
-    resultado_ia = modelo.predict(dados_usuario)
-    preco_base = float(resultado_ia[0])
+        # Limpeza rápida de nomes de cidades e estados
+        cidade_limpa = cidade.lower().strip() if cidade else ""
+        
+        # Tratamento simplificado de UF se vier o nome completo do estado
+        if len(estado_uf) > 2:
+            mapeamento_estados = {"são paulo": "SP", "rio de janeiro": "RJ", "minas gerais": "MG"}
+            estado_uf = mapeamento_estados.get(estado_uf.lower(), "SP")
+        if not estado_uf: 
+            estado_uf = "SP" # Fallback prudente
 
-    # 🗺️ TABELA DE PREÇOS REAIS POR METRO QUADRADO (MÉDIA DE MERCADO 2026)
-    # Evita distorções de modelos matemáticos que cruzam fronteiras de cidades vizinhas
-    tabela_m2_cidades = {
-        "Cubatão": 4200.0,
-        "São Vicente": 4900.0,
-        "Praia Grande": 5200.0,
-        "Santos": 8200.0,
-        "Guarujá": 7100.0,
-        "São Paulo": 9800.0
-    }
-    
-    # Identifica o preço de m² da cidade ou assume uma média regional se falhar
-    preco_m2_referencia = tabela_m2_cidades.get(cidade_detectada, 5500.0)
-    
-    # Se o modelo matemático disparar por causa de vizinhos caros (como Santos), a gente trava no limite da cidade
-    custo_mercado_local = area_m2 * preco_m2_referencia
-    valor_adicional_vagas = vagas * 25000
-    
-    # Preço calculado com base estrita no comportamento do m² da própria cidade
-    preco_real_calculado = custo_mercado_local + valor_adicional_vagas
-    
-    # Média ponderada para suavizar o modelo: 80% peso da cidade real e 20% dinâmica do modelo XGBoost
-    preco_final = (preco_real_calculado * 0.80) + (preco_base * 0.20)
+        # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
+        dados_uf = tabela_m2_brasil.get(estado_uf, tabela_m2_brasil["PADRAO"])
+        
+        # Regras de especificidade (Cidade específica -> Capital -> Interior)
+        if "cubatão" in cidade_limpa:
+            preco_m2_base = dados_uf.get("cubatao", 4300)
+        elif cidade_limpa and any(k in cidade_limpa for k in ["são paulo", "rio de janeiro", "curitiba", "belo horizonte", "porto alegre", "recife", "salvador", "fortaleza", "brasília"]):
+            preco_m2_base = dados_uf.get("capital")
+        else:
+            preco_m2_base = dados_uf.get("interior_no_geral")
 
-    # Exibição dos resultados estruturados na tela
-    st.success(f"### Valor de Mercado Estimado: R$ {preco_final:,.2f}")
-    st.metric(label="Preço Médio por m² nesta simulação", value=f"R$ {preco_final/area_m2:,.2f}/m²")
-    
-    st.subheader("📍 Localização do Imóvel:")
-    if cidade_detectada:
-        st.write(f"**Cidade Identificada:** {cidade_detectada} | **Bairro:** {bairro_detectado}")
-    st.info(f"**Endereço Completo:** {endereco_completo}")
+        # 🧠 PREDITOR COMBINADO
+        # XGBoost calcula a proporção do valor pelo tamanho e distribuição de cômodos
+        dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
+        proporcao_ia = float(modelo.predict(dados_usuario))
+        
+        # Preço base estruturado no m² comercial real do município atual
+        valor_m2_calculado = area_m2 * preco_m2_base
+        
+        # Agrega o peso das variáveis físicas tratadas pelo modelo
+        preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
+        
+        # Multiplicadores de padrão de acabamento
+        if padrao == "Econômico / Popular":
+            preco_final *= 0.85
+        elif padrao == "Alto Padrão / Luxo":
+            preco_final *= 1.30
+
+        # Adiciona valor de mercado por vaga de garagem extra comercializável
+        preco_final += (vagas * 20000)
+
+        # Exibição Analítica dos Resultados na Tela
+        st.success(f"## Valor de Mercado Estimado: R$ {preco_final:,.2f}")
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric(label="Média do m² Calculado", value=f"R$ {preco_final/area_m2:,.2f}/m²")
+        c2.metric(label="Cidade / UF Identificada", value=f"{cidade if cidade else 'Região Identificada'} - {estado_uf}")
+        c3.metric(label="Coordenadas de Análise", value=f"{latitude:.4f}, {longitude:.4f}")
+        
+        st.info(f"📍 **Endereço Completo no Mapa:** {endereco_completo if endereco_completo else 'Busca por coordenadas locais.'}")
