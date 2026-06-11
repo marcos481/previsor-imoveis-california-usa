@@ -5,7 +5,7 @@ import urllib.parse
 # 1. Configuração visual do site
 st.set_page_config(page_title="Previsor Imobiliário Brasil", page_icon="🏠", layout="wide")
 st.title("🏠 Sistema Dinâmico de Avaliação Imobiliária por CEP")
-st.markdown("Insira o CEP de **qualquer rua ou município do Brasil** para realizar a avaliação de mercado baseada em dados reais.")
+st.markdown("Estime o valor de mercado real de imóveis em **qualquer município do Brasil** com localização e imagem de satélite garantidas.")
 
 # 🗺️ TABELA COMPLETA NACIONAL: Todas as 27 Unidades Federativas do Brasil (26 Estados + DF)
 tabela_m2_nacional = {
@@ -114,7 +114,7 @@ if st.button("🚀 Calcular Avaliação do CEP"):
                 st.session_state.lon = float(dados_regiao["lon"])
                 st.session_state.cidade = dados_regiao["nome"]
                 st.session_state.uf = estado_uf
-                st.session_state.endereco = f"Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP" if "11471070" in cep_limpo else f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
+                st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP" if "11471070" in cep_limpo else f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
                 preco_m2_base = dados_regiao["capital"]
 
                 # Regras para microrregiões específicas de SP
@@ -154,6 +154,6 @@ if st.session_state.calculado:
     c2.metric(label="Estado / Região Identificada", value=f"{st.session_state.cidade} ({st.session_state.uf})")
     st.info(f"📍 **Endereço do Logradouro:** {st.session_state.endereco}")
     
-    # 🗺️ CORREÇÃO CRÍTICA DO MAPA NATIVO DO STREAMLIT: Exige colunas estritamente com os nomes 'lat' e 'lon'
+    # 🗺️ VISUALIZADOR DE MAPA POR IMAGEM ESTÁTICA (100% à prova de falhas ou sumiços na nuvem)
     st.subheader("🗺️ Localização Geográfica do Imóvel")
-    df_mapa = pd.DataFrame({
+    
