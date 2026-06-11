@@ -63,76 +63,58 @@ with col_dir:
 if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
     with st.spinner("Buscando coordenadas exatas e aplicando índices locais..."):
         
-        # Inicialização vazia para evitar que o código herde dados de Cubatão se falhar
-        latitude, longitude = -23.9922, -46.2594  # Centro do Guarujá como nova coordenada base de segurança
-        cidade_detectada = ""
-        estado_uf = ""
-        endereco_completo = ""
-
-        # Passo 1: Limpeza do input para busca via API de CEP (ViaCEP)
+        # Inteligência preventiva: Define fallbacks baseados no que o usuário digitou
         texto_limpo = ''.join(filter(str.isdigit, endereco_digitado)).strip()
         
+        if "114" in texto_limpo or "guaruja" in endereco_digitado.lower() or "guarujá" in endereco_digitado.lower():
+            cidade_detectada, estado_uf = "Guarujá", "SP"
+            latitude, longitude = -23.9922, -46.2594
+        else:
+            cidade_detectada, estado_uf = "Cubatão", "SP"
+            latitude, longitude = -23.8900, -46.4200
+            
+        endereco_completo = endereco_digitado
+
+        # Passo 1: Busca via API de CEP (ViaCEP) se for formato numérico
         if len(texto_limpo) == 8:
             try:
                 url_cep = f"https://viacep.com.br{texto_limpo}/json/"
-                res_cep = requests.get(url_cep, timeout=8).json()
+                res_cep = requests.get(url_cep, timeout=6).json()
                 if "localidade" in res_cep:
                     cidade_detectada = res_cep["localidade"]
                     estado_uf = res_cep["uf"]
                     endereco_completo = f"{res_cep.get('logradouro', '')}, {res_cep.get('bairro', '')} - {cidade_detectada}, {estado_uf}"
-            except Exception as e:
-                st.warning("⚠️ Lentidão ao consultar banco de CEPs. Tentando geolocalizador alternativo...")
-
-        # Se não for CEP numérico ou se o ViaCEP falhar, processa o texto direto
-        if not cidade_detectada:
-            endereco_completo = endereco_digitado
-
-        # Passo 2: Tradutor Geográfico de Alta Precisão (Obtém Lat/Lon reais da rua/cidade encontrada)
-        try:
-            url_geo = f"https://maps.co{endereco_completo}, Brasil"
-            res_geo = requests.get(url_geo, timeout=8).json()
-            if isinstance(res_geo, list) and len(res_geo) > 0:
-                latitude = float(res_geo[0]['lat'])
-                longitude = float(res_geo[0]['lon'])
-                
-                # Se a busca por texto direto localizou novas informações de endereço
-                if not cidade_detectada and 'display_name' in res_geo[0]:
-                    endereco_completo = res_geo[0]['display_name']
-        except:
-            try:
-                # Contingência secundária via OpenStreetMap estruturado
-                url_nominatim = f"https://openstreetmap.org{endereco_completo}, Brasil&addressdetails=1"
-                headers = {'User-Agent': 'previsor_imobiliario_marcos_v9'}
-                res_nom = requests.get(url_nominatim, headers=headers, timeout=8).json()
-                if len(res_nom) > 0:
-                    latitude = float(res_nom[0]['lat'])
-                    longitude = float(res_nom[0]['lon'])
-                    detalhes = res_nom[0].get('address', {})
-                    if not cidade_detectada:
-                        cidade_detectada = detalhes.get('city', detalhes.get('town', detalhes.get('municipality', '')))
-                        estado_uf = detalhes.get('state_code', '').upper()
             except:
                 pass
 
-        # Fallback inteligente se os servidores de mapa falharem completamente em identificar o texto
-        if not cidade_detectada:
-            if "114" in texto_limpo or "guaruja" in endereco_digitado.lower():
-                cidade_detectada, estado_uf = "Guarujá", "SP"
-                latitude, longitude = -23.9922, -46.2594
-            else:
-                cidade_detectada, estado_uf = "Cubatão", "SP"
-                latitude, longitude = -23.8900, -46.4200
+        # Passo 2: Tradutor Geográfico de Alta Precisão (Obtém Lat/Lon reais da rua do imóvel)
+        try:
+            url_geo = f"https://maps.co{endereco_completo}, Brasil"
+            res_geo = requests.get(url_geo, timeout=6).json()
+            if isinstance(res_geo, list) and len(res_geo) > 0:
+                latitude = float(res_geo[0]['lat'])
+                longitude = float(res_geo[0]['lon'])
+        except:
+            try:
+                url_nominatim = f"https://openstreetmap.org{endereco_completo}, Brasil"
+                headers = {'User-Agent': 'previsor_imobiliario_marcos_v10'}
+                res_nom = requests.get(url_nominatim, headers=headers, timeout=6).json()
+                if len(res_nom) > 0:
+                    latitude = float(res_nom[0]['lat'])
+                    longitude = float(res_nom[0]['lon'])
+            except:
+                pass
 
-        # Limpeza técnica de strings para validação na tabela de preços
+        # Ajuste de caixa das variáveis de texto
         cidade_limpa = cidade_detectada.lower().strip()
-        estado_uf = estado_uf.upper().strip() if estado_uf else "SP"
+        estado_uf = estado_uf.upper().strip()
 
-        # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO BASEADO NA CIDADE REAL DETECTADA
+        # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
         dados_uf = tabela_m2_brasil.get(estado_uf, tabela_m2_brasil["PADRAO"])
         
         if "guaruja" in cidade_limpa or "guarujá" in cidade_limpa:
             preco_m2_base = dados_uf.get("guaruja", 7100)
-        elif "cubatão" in city = cidade_limpa or "cubatao" in cidade_limpa:
+        elif "cubatão" in cidade_limpa or "cubatao" in cidade_limpa:
             preco_m2_base = dados_uf.get("cubatao", 4300)
         elif "santos" in cidade_limpa:
             preco_m2_base = dados_uf.get("santos", 8200)
@@ -141,10 +123,10 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR (Utilizando )
+        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao[0])  # <--- CORREÇÃO DO ARRAY DE PREDIÇÃO
+        proporcao_ia = float(resultado_predicao[0])  # Extração explícita de array
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -167,6 +149,6 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_mapa, zoom=14)
         
-        # Link dinâmico para o app externo do Google Maps
+        # Link para o app externo do Google Maps
         url_google_maps = f"https://google.com{latitude},{longitude}"
         st.markdown(f"[🔗 Clique aqui para abrir este imóvel direto no app do Google Maps]({url_google_maps})")
