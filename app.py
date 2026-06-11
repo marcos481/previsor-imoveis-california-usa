@@ -29,7 +29,7 @@ tabela_m2_nacional = {
     "PR": {"capital": 7800, "interior": 4500, "lat": -25.4290, "lon": -49.2671, "nome": "Paraná"},
     "RJ": {"capital": 10100, "interior": 4800, "lat": -22.9068, "lon": -43.1729, "nome": "Rio de Janeiro"},
     "RN": {"capital": 5800, "interior": 3500, "lat": -5.7950, "lon": -35.2094, "nome": "Rio Grande do Norte"},
-    "RO": {"capital": 5200, "interior": 3400, "lat": -8.7619, "lon": -63.9039, "nome": "Rondônia"}, # Rondônia mapeado com GPS exato
+    "RO": {"capital": 5200, "interior": 3400, "lat": -8.7619, "lon": -63.9039, "nome": "Rondônia"},
     "RR": {"capital": 4700, "interior": 3100, "lat": 2.8198, "lon": -60.6715, "nome": "Roraima"},
     "RS": {"capital": 6800, "interior": 4100, "lat": -30.0346, "lon": -51.2177, "nome": "Rio Grande do Sul"},
     "SC": {"capital": 11000, "interior": 6500, "lat": -27.5954, "lon": -48.5480, "nome": "Santa Catarina"},
@@ -38,6 +38,15 @@ tabela_m2_nacional = {
     "TO": {"capital": 5300, "interior": 3400, "lat": -10.1844, "lon": -48.3336, "nome": "Tocantins"},
     "PADRAO": {"capital": 5500, "interior": 3500, "lat": -15.7938, "lon": -47.8827, "nome": "Brasil"}
 }
+
+# Inicialização das variáveis de controle na sessão do Streamlit
+if "lat" not in st.session_state: st.session_state.lat = -24.00169
+if "lon" not in st.session_state: st.session_state.lon = -46.27318
+if "endereco" not in st.session_state: st.session_state.endereco = "Aguardando digitação do CEP..."
+if "cidade" not in st.session_state: st.session_state.cidade = "Guarujá"
+if "uf" not in st.session_state: st.session_state.uf = "SP"
+if "preco_total" not in st.session_state: st.session_state.preco_total = 0.0
+if "calculado" not in st.session_state: st.session_state.calculado = False
 
 # 2. Interface de entrada em colunas
 col_esq, col_dir = st.columns(2)
@@ -54,7 +63,7 @@ with col_dir:
     cep_digitado = st.text_input("Digite o CEP do Imóvel (Apenas números ou com hífen)", "")
     st.caption("Insira o CEP desejado para desbloquear os cálculos regionais de qualquer estado.")
 
-# 3. Processamento Analítico de Faixas de CEP Nacionais (Imune a quedas de internet)
+# 3. Processamento Analítico de Faixas de CEP Nacionais
 if st.button("🚀 Calcular Avaliação do CEP"):
     if not cep_digitado:
         st.error("❌ Por favor, insira um CEP para realizar a pesquisa.")
@@ -66,15 +75,11 @@ if st.button("🚀 Calcular Avaliação do CEP"):
             if len(cep_limpo) != 8:
                 st.error("❌ O CEP deve conter exatamente 8 números.")
             else:
-                # 🧠 ENGINE INTERNA DE IDENTIFICAÇÃO DE ESTADO POR PREFIJO DE CEP (BRASIL INTEIRO)
                 prefixo_2 = int(cep_limpo[:2])
                 prefixo_3 = int(cep_limpo[:3])
                 
-                # Definição padrão inicial
                 estado_uf = "SP"
-                cidade_detectada = "São Paulo"
                 
-                # Estrutura de divisão postal oficial do Brasil
                 if 0 <= prefixo_2 <= 19: estado_uf = "SP"
                 elif 20 <= prefixo_2 <= 28: estado_uf = "RJ"
                 elif 29 <= prefixo_2 <= 29: estado_uf = "ES"
@@ -97,59 +102,57 @@ if st.button("🚀 Calcular Avaliação do CEP"):
                 elif 70 <= prefixo_2 <= 72 or 730 <= prefixo_3 <= 736: estado_uf = "DF"
                 elif 737 <= prefixo_3 <= 762: estado_uf = "GO"
                 elif 77 <= prefixo_2 <= 77: estado_uf = "TO"
-                elif 768 <= prefixo_3 <= 769: estado_uf = "RO" # Identificação exata de Rondônia (768-769)
+                elif 768 <= prefixo_3 <= 769: estado_uf = "RO"
                 elif 780 <= prefixo_3 <= 788: estado_uf = "MT"
                 elif 79 <= prefixo_2 <= 79: estado_uf = "MS"
                 elif 80 <= prefixo_2 <= 87: estado_uf = "PR"
                 elif 88 <= prefixo_2 <= 89: estado_uf = "SC"
                 elif 90 <= prefixo_2 <= 99: estado_uf = "RS"
 
-                # Puxa as coordenadas e o nome do estado direto da nossa tabela nacional completa
                 dados_regiao = tabela_m2_nacional.get(estado_uf, tabela_m2_nacional["PADRAO"])
-                latitude = dados_regiao["lat"]
-                longitude = dados_regiao["lon"]
-                cidade_detectada = dados_regiao["nome"]
-                endereco_oficial = f"Região do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
-
-                # 💎 Ajustes finos adicionais e tratamentos de microrregiões paulistas salvas se for SP
+                st.session_state.lat = dados_regiao["lat"]
+                st.session_state.lon = dados_regiao["lon"]
+                st.session_state.cidade = dados_regiao["nome"]
+                st.session_state.uf = estado_uf
+                st.session_state.endereco = f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
                 preco_m2_base = dados_regiao["capital"]
+
+                # Regras para microrregiões específicas de SP
                 if estado_uf == "SP":
                     if "11471070" in cep_limpo:
-                        endereco_oficial = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
-                        latitude, longitude = -24.00169, -46.27318
+                        st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
+                        st.session_state.lat, st.session_state.lon = -24.00169, -46.27318
                         preco_m2_base = dados_regiao["guaruja"]
-                        cidade_detectada = "Guarujá"
+                        st.session_state.cidade = "Guarujá"
                     elif "114" in cep_limpo[:3]:
                         preco_m2_base = dados_regiao["guaruja"]
-                        cidade_detectada = "Guarujá"
+                        st.session_state.cidade = "Guarujá"
                     elif "115" in cep_limpo[:3]:
                         preco_m2_base = dados_regiao["cubatao"]
-                        cidade_detectada = "Cubatão"
+                        st.session_state.cidade = "Cubatão"
                     elif "110" in cep_limpo[:3]:
                         preco_m2_base = dados_regiao["santos"]
-                        cidade_detectada = "Santos"
+                        st.session_state.cidade = "Santos"
 
-                # Se o CEP for de capital (geralmente terminados em 000 em estados menores ou faixas iniciais)
-                # Como simplificação robusta, adota a média ponderada da tabela
-                if int(cep_limpo[5:]) > 0 and estado_uf != "SP":
-                    # Fora da capital, aplica o valor do m² do interior do estado correspondente
+                if int(cep_limpo[5:]) > 0 and estado_uf != "SP" and "11471070" not in cep_limpo:
                     preco_m2_base = dados_regiao["interior"]
 
-                # 🧠 MOTOR DE CÁLCULO MATRICIAL SUAVIZADO
+                # Cálculo estruturado de precificação
                 valor_base_estrutura = (area_m2 * preco_m2_base) + (quartos * 8000) + (vagas * 12000)
                 if padrao == "Econômico / Popular": valor_base_estrutura *= 0.82
                 elif padrao == "Alto Padrão / Luxo": valor_base_estrutura *= 1.25
                 
-                preco_total_calculado = valor_base_estrutura * 0.94
+                st.session_state.preco_total = valor_base_estrutura * 0.93
+                st.session_state.calculado = True
 
-                # 4. RENDERS DE RESULTADO NA INTERFACE
-                st.success(f"## Valor de Mercado Estimado: R$ {preco_total_calculado:,.2f}")
-                
-                c1, c2 = st.columns(2)
-                c1.metric(label="Preço do m² Aplicado", value=f"R$ {preco_total_calculado/area_m2:,.2f}/m²")
-                c2.metric(label="Estado / Região Identificada", value=f"{cidade_detectada} ({estado_uf})")
-                
-                st.info(f"📍 **Endereço do Logradouro:** {endereco_oficial}")
-                
-                # 🗺️ MAPA NATIVO DO STREAMLIT RENDERIZADO COM SUCESSO
-                st.subheader("🗺️ Localização Geográfica do Imóvel")
+# 4. EXIBIÇÃO CONSOLIDADA DOS RESULTADOS NA TELA
+if st.session_state.calculado:
+    st.success(f"## Valor de Mercado Estimado: R$ {st.session_state.preco_total:,.2f}")
+    
+    c1, c2 = st.columns(2)
+    c1.metric(label="Preço do m² Aplicado", value=f"R$ {st.session_state.preco_total/area_m2:,.2f}/m²")
+    c2.metric(label="Estado / Região Identificada", value=f"{st.session_state.cidade} ({st.session_state.uf})")
+    st.info(f"📍 **Endereço do Logradouro:** {st.session_state.endereco}")
+    
+    # 🗺️ VISUALIZADOR DE MAPA BLINDADO EM EMBED HTML (Usa OpenStreetMap aberto e estável)
+    st.subheader("🗺️ Localização Geográfica do Imóvel")
