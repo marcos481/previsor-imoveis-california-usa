@@ -39,7 +39,7 @@ tabela_m2_nacional = {
     "PADRAO": {"capital": 5500, "interior": 3500, "lat": -15.7938, "lon": -47.8827, "nome": "Brasil"}
 }
 
-# Inicialização das variáveis de controle na sessão do Streamlit
+# Inicialização das variáveis persistentes de sessão
 if "lat" not in st.session_state: st.session_state.lat = -24.00169
 if "lon" not in st.session_state: st.session_state.lon = -46.27318
 if "endereco" not in st.session_state: st.session_state.endereco = "Aguardando digitação do CEP..."
@@ -110,8 +110,8 @@ if st.button("🚀 Calcular Avaliação do CEP"):
                 elif 90 <= prefixo_2 <= 99: estado_uf = "RS"
 
                 dados_regiao = tabela_m2_nacional.get(estado_uf, tabela_m2_nacional["PADRAO"])
-                st.session_state.lat = dados_regiao["lat"]
-                st.session_state.lon = dados_regiao["lon"]
+                st.session_state.lat = float(dados_regiao["lat"])
+                st.session_state.lon = float(dados_regiao["lon"])
                 st.session_state.cidade = dados_regiao["nome"]
                 st.session_state.uf = estado_uf
                 st.session_state.endereco = f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
@@ -121,7 +121,8 @@ if st.button("🚀 Calcular Avaliação do CEP"):
                 if estado_uf == "SP":
                     if "11471070" in cep_limpo:
                         st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
-                        st.session_state.lat, st.session_state.lon = -24.00169, -46.27318
+                        st.session_state.lat = float(-24.00169)
+                        st.session_state.lon = float(-46.27318)
                         preco_m2_base = dados_regiao["guaruja"]
                         st.session_state.cidade = "Guarujá"
                     elif "114" in cep_limpo[:3]:
@@ -154,5 +155,6 @@ if st.session_state.calculado:
     c2.metric(label="Estado / Região Identificada", value=f"{st.session_state.cidade} ({st.session_state.uf})")
     st.info(f"📍 **Endereço do Logradouro:** {st.session_state.endereco}")
     
-    # 🗺️ VISUALIZADOR DE MAPA BLINDADO EM EMBED HTML (Usa OpenStreetMap aberto e estável)
+    # 🗺️ RETORNO AO MAPA NATIVO DO STREAMLIT (100% seguro contra bloqueios de iFrames)
     st.subheader("🗺️ Localização Geográfica do Imóvel")
+    df_mapa = pd.DataFrame({
