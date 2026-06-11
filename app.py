@@ -9,7 +9,6 @@ st.title("🏠 Sistema Profissional de Avaliação Imobiliária (Google Maps API
 st.markdown("Estime o valor de mercado real cruzando dados físicos com a infraestrutura oficial do Google em todo o território nacional.")
 
 # 🗺️ TABELA COMPLETA NACIONAL: Cobertura de todas as 27 Unidades Federativas do Brasil
-# Valores de m² calibrados de acordo com os índices médios de mercado regionais
 tabela_m2_nacional = {
     "AC": {"capital": 5100, "interior": 3400},
     "AL": {"capital": 6500, "interior": 3800},
@@ -17,7 +16,7 @@ tabela_m2_nacional = {
     "AP": {"capital": 4800, "interior": 3200},
     "BA": {"capital": 6200, "interior": 3600},
     "CE": {"capital": 5900, "interior": 3500},
-    "DF": {"capital": 8900, "interior": 5200}, # Brasília e Regiões Administrativas
+    "DF": {"capital": 8900, "interior": 5200},
     "ES": {"capital": 7400, "interior": 4500},
     "GO": {"capital": 6500, "interior": 3800},
     "MA": {"capital": 5300, "interior": 3300},
@@ -36,7 +35,7 @@ tabela_m2_nacional = {
     "RS": {"capital": 6800, "interior": 4100},
     "SC": {"capital": 11000, "interior": 6500},
     "SE": {"capital": 5500, "interior": 3400},
-    "SP": {"capital": 10200, "interior": 5400, "guaruja": 5400, "cubatao": 3600}, # Microrregiões paulistas salvas
+    "SP": {"capital": 10200, "interior": 5400, "guaruja": 5400, "cubatao": 3600},
     "TO": {"capital": 5300, "interior": 3400},
     "PADRAO": {"capital": 5500, "interior": 3500}
 }
@@ -50,7 +49,7 @@ google_api_key = st.sidebar.text_input(
 )
 
 if not google_api_key:
-    st.sidebar.warning("⚠️ Modo de Contingência Ativo: Insira a chave do Google para liberar o mapa oficial por lote.")
+    st.sidebar.warning("⚠️ Modo de Contingência Ativo: Insira a chave do Google para liberar a captura do link e mapas reais.")
 
 # Interface de entrada em colunas
 col_esq, col_dir = st.columns(2)
@@ -74,14 +73,16 @@ if st.button("🚀 Calcular Avaliação Profissional"):
     estado_uf = "SP"
     endereco_oficial = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
     latitude, longitude = -24.00169, -46.27318
+    url_final_google = f"https://google.com{latitude},{longitude}"
     
     # Se o usuário digitou Cubatão, ajusta a contingência básica
     if "cubatao" in endereco_digitado.lower() or "cubatão" in endereco_digitado.lower():
         cidade_detectada = "Cubatão"
         endereco_oficial = "Região de Cubatão, SP"
         latitude, longitude = -23.8920, -46.4250
+        url_final_google = f"https://google.com{latitude},{longitude}"
 
-    # 🌐 SE A CHAVE EXISTIR: O Google assume o controle absoluto da localização e descobre a UF real
+    # 🌐 SE A CHAVE EXISTIR: O Google assume o controle absoluto da localização e captura o link exato do local
     if google_api_key:
         with st.spinner("Consultando servidores do Google Geocoding..."):
             try:
@@ -90,10 +91,17 @@ if st.button("🚀 Calcular Avaliação Profissional"):
                 response = requests.get(url_google, timeout=8).json()
                 
                 if response['status'] == 'OK':
-                    resultado = response['results']
+                    resultado = response['results'][0] # Captura a correspondência mais precisa
                     latitude = float(resultado['geometry']['location']['lat'])
                     longitude = float(resultado['geometry']['location']['lng'])
                     endereco_oficial = resultado['formatted_address']
+                    
+                    # 💎 CAPTURA DO LINK EXATO: Obtém o código identificador exclusivo do lote urbano (Place ID)
+                    google_place_id = resultado.get('place_id')
+                    if google_place_id:
+                        url_final_google = f"https://google.com:{google_place_id}"
+                    else:
+                        url_final_google = f"https://google.com{latitude},{longitude}"
                     
                     # Varre os componentes do Google para achar Cidade e Estado corretos
                     for comp in resultado['address_components']:
@@ -108,17 +116,13 @@ if st.button("🚀 Calcular Avaliação Profissional"):
 
     # 💎 PREÇO DO M² PONDERADO REGIONAL DINÂMICO NACIONAL
     cidade_limpa = cidade_detectada.lower().strip()
-    
-    # Busca a sub-tabela do estado retornado pelo Google (Ex: "RJ", "MG", "SC")
     sub_tabela = tabela_m2_nacional.get(estado_uf, tabela_m2_nacional["PADRAO"])
     
-    # Regras específicas para cidades paulistas salvas
     if estado_uf == "SP" and ("guaruja" in cidade_limpa or "guarujá" in cidade_limpa):
         preco_m2_base = sub_tabela.get("guaruja", 5400)
     elif estado_uf == "SP" and ("cubatão" in cidade_limpa or "cubatao" in cidade_limpa):
         preco_m2_base = sub_tabela.get("cubatao", 3600)
-    # Lógica nacional geral: se o nome da cidade conter o termo da própria capital ou se for região metropolitana polo
-    elif any(k in cidade_limpa for k in ["são paulo", "rio", "belo horizonte", "curitiba", "porto alegre", "brasília", "recife", "salvador", "fortaleza", "goiânia", "manaus"]):
+    elif any(k in cidade_limpa for k in ["são paulo", "rio", "belo horizonte", "curitiba", "porto alegre", "brasília", "recife", "salvador"]):
         preco_m2_base = sub_tabela.get("capital")
     else:
         preco_m2_base = sub_tabela.get("interior")
@@ -135,7 +139,7 @@ if st.button("🚀 Calcular Avaliação Profissional"):
     c1, c2 = st.columns(2)
     c1.metric(label="Preço do m² Calculado", value=f"R$ {preco_final/area_m2:,.2f}/m²")
     c2.metric(label="Localidade Validada", value=f"{cidade_detectada} - {estado_uf}")
-    st.info(f"📍 **Endereço Confirmado:** {endereco_oficial}")
+    st.info(f"📍 **Endereço Confirmado pelo Google:** {endereco_oficial}")
     
     # 🗺️ VISUALIZADOR DE MAPA PROFISSIONAL COM SELEÇÃO INTELIGENTE
     st.subheader("🗺️ Localização Geográfica")
@@ -147,6 +151,7 @@ if st.button("🚀 Calcular Avaliação Profissional"):
         df_contingencia = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_contingencia, zoom=14)
 
-    # 🔗 LINK DE DIRECIONAMENTO EXTERNO (Universal)
-    url_final_google = f"https://google.com{latitude},{longitude}"
-    st.link_button("➡️ Abrir Rota Direta no Aplicativo do Google Maps", url_google_maps_oficial if 'url_google_maps_oficial' in locals() else url_final_google, type="primary")
+    # 🔗 EXIBIÇÃO E ACESSO AO LINK DIRETOR DO GOOGLE MAPS
+    st.subheader("🔗 Link Direto do Endereço")
+    st.code(url_final_google, language="text") # Permite copiar o link com um clique
+    st.link_button("➡️ Abrir Localização no Aplicativo do Google Maps", url_final_google, type="primary")
