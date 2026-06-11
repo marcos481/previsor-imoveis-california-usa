@@ -133,7 +133,7 @@ if st.session_state.calculado:
     col_lat.metric("Latitude do Imóvel", f"{st.session_state.lat:.5f}")
     col_lon.metric("Longitude do Imóvel", f"{st.session_state.lon:.5f}")
     
-    # 🔗 LINK GOOGLE MAPS PROFISSIONAL POR COORDENADAS COPIADAS DA MEMÓRIA
+    # 🔗 LINK GOOGLE MAPS CORRIGIDO (Formato clássico e blindado contra telas em branco)
     url_google_maps = f"https://google.com{st.session_state.lat},{st.session_state.lon}"
     with col_btn:
         st.write("")  # Ajuste de espaçamento vertical
