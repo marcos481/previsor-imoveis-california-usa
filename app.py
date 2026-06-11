@@ -80,7 +80,6 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
                     longitude = resultado['geometry']['location']['lng']
                     endereco_completo = resultado['formatted_address']
                     
-                    # Extrai cidade e estado dos componentes do Google
                     for comp in resultado['address_components']:
                         if "administrative_area_level_2" in comp['types']:
                             cidade_detectada = comp['long_name']
@@ -101,7 +100,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
                 pass # Mantém o padrão Cubatão se falhar
 
         # Limpeza das variáveis de texto
-        cidade_limpa = cidade_detectada.lower().strip()
+        cidade_limpa = city = cidade_detectada.lower().strip()
         estado_uf = estado_uf.upper().strip()
 
         # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
@@ -114,9 +113,10 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO
+        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
-        proporcao_ia = float(modelo.predict(dados_usuario))
+        resultado_predicao = modelo.predict(dados_usuario)
+        proporcao_ia = float(resultado_predicao)  # <--- CORREÇÃO DEFINITIVA AQUI
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -134,7 +134,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         
         st.info(f"📍 **Endereço Formatado:** {endereco_completo}")
         
-        # 🗺️ RENDERIZADOR DE MAPA COM LINKS DIRETOS PARA O GOOGLE MAPS
+        # 🗺️ RENDERIZADOR DE MAPA CORRIGIDO (Nome exato das colunas 'latitude' e 'longitude')
         st.subheader("🗺️ Visualização Geográfica")
         df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_mapa, zoom=15)
