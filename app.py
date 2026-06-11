@@ -100,7 +100,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
                 pass # Mantém o padrão Cubatão se falhar
 
         # Limpeza das variáveis de texto
-        cidade_limpa = city = cidade_detectada.lower().strip()
+        cidade_limpa = cidade_detectada.lower().strip()
         estado_uf = estado_uf.upper().strip()
 
         # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
@@ -113,10 +113,10 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR
+        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR (Utilizando)
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao)  # <--- CORREÇÃO DEFINITIVA AQUI
+        proporcao_ia = float(resultado_predicao[0])  # <--- CORREÇÃO CIRÚRGICA AQUI
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
