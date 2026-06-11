@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import urllib.parse
 
 # 1. Configuração visual do site
 st.set_page_config(page_title="Previsor Imobiliário Brasil Pro", page_icon="🏠", layout="wide")
@@ -37,7 +38,7 @@ with col_esq:
     padrao = st.selectbox("Padrão de Acabamento", ["Econômico / Popular", "Médio / Padrão", "Alto Padrão / Luxo"])
 
 with col_dir:
-    st.subheader("📍 Localização Nacional por CEP")
+    st.subheader("📍 Localização por CEP")
     cep_digitado = st.text_input("Digite o CEP do Imóvel", "11471-070")
     st.caption("Exemplos: '11471-070' (Guarujá), '11520-000' (Cubatão), '01310-100' (São Paulo Capital)")
 
@@ -111,15 +112,15 @@ if st.session_state.calculado:
     c1.metric(label="Preço Médio por m² Obtido", value=f"R$ {st.session_state.preco_total/area_m2:,.2f}/m²")
     c2.metric(label="Localidade Identificada", value=f"{st.session_state.cidade} - {st.session_state.uf}")
     
-    # Exibe o endereço 100% correto na tela
+    # Exibe o endereço correto e atualizado
     st.info(f"📍 **Endereço do Logradouro:** {st.session_state.endereco}")
     
-    # 🗺️ LINK GOOGLE MAPS BLINDADO
+    # 🗺️ LINK GOOGLE MAPS BLINDADO CONTRA ERROS DE ACENTUAÇÃO E DNS
     st.subheader("🗺️ Verificação Geográfica do Imóvel")
     st.markdown("Clique no botão abaixo para abrir a localização oficial exata diretamente no Google Maps.")
     
-    # Monta a URL de forma limpa, substituindo espaços por '+' e limpando caracteres incompatíveis com URLs
-    rua_limpa = st.session_state.endereco.replace(" ", "+").replace("-", "").replace(",", "")
-    url_google_maps_oficial = f"https://google.com{rua_limpa}"
+    # 🛡️ SOLUÇÃO DEFINITIVA: O urllib.parse.quote codifica os caracteres especiais com segurança total
+    endereco_seguro_url = urllib.parse.quote(st.session_state.endereco)
+    url_google_maps_oficial = f"https://google.com{endereco_seguro_url}"
     
     st.link_button("➡️ Abrir Localização no Google Maps", url_google_maps_oficial, type="primary")
