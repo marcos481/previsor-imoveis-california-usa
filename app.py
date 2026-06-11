@@ -155,6 +155,5 @@ if st.session_state.calculado:
     c2.metric(label="Estado / Região Identificada", value=f"{st.session_state.cidade} ({st.session_state.uf})")
     st.info(f"📍 **Endereço do Logradouro:** {st.session_state.endereco}")
     
-    # 🗺️ RETORNO AO MAPA NATIVO DO STREAMLIT (100% seguro contra bloqueios de iFrames)
+    # 🗺️ RENDERIZADOR DE MAPA NATIVO DO STREAMLIT (Dicionário de dados fechado corretamente)
     st.subheader("🗺️ Localização Geográfica do Imóvel")
-    df_mapa = pd.DataFrame({
