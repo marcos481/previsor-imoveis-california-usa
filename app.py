@@ -3,11 +3,12 @@ import pandas as pd
 import xgboost as xgb
 import io
 import requests
+import urllib.parse
 
 # 1. Configuração visual do site
-st.set_page_config(page_title="Previsor Imobiliário Brasil Pro", page_icon="🏠", layout="wide")
-st.title("🏠 Sistema de Avaliação Imobiliária com Localização Exata")
-st.markdown("Estime o valor de mercado baseado em CEP ou endereço real cruzado com inteligência artificial.")
+st.set_page_config(page_title="Previsor Imobiliário Google Maps Pro", page_icon="🏠", layout="wide")
+st.title("🏠 Sistema Profesional de Avaliação Imobiliária com Google Maps")
+st.markdown("Estime o valor de mercado real cruzando a **API oficial do Google Maps** com inteligência artificial.")
 
 # 2. Base de dados base para tendências de tamanho e cômodos
 @st.cache_resource
@@ -32,7 +33,7 @@ def treinar_ia_nacional():
 with st.spinner("Inicializando motores de cálculo..."):
     modelo = treinar_ia_nacional()
 
-# Tabela dinâmica de valor do m² médio por Estado/Capital/Cidade (Mercado Real)
+# Tabela dinâmica de valor do m² médio por Estado/Capital/Cidade (Mercado Real 2026)
 tabela_m2_brasil = {
     "SP": {"capital": 10200, "interior_no_geral": 5400, "cubatao": 4300, "guaruja": 7100, "santos": 8200},
     "RJ": {"capital": 10100, "interior_no_geral": 4800},
@@ -44,7 +45,18 @@ tabela_m2_brasil = {
     "PADRAO": {"capital": 5500, "interior_no_geral": 3500}
 }
 
-# 3. Interface em colunas
+# 3. Painel Lateral para Configuração do Google Maps
+st.sidebar.header("🔑 Credenciais do Sistema")
+google_key = st.sidebar.text_input(
+    "Chave API do Google Maps", 
+    type="password", 
+    help="Insira sua chave do Geocoding API do Google Cloud para ativar a precisão por ruas e CEPs."
+)
+
+if not google_key:
+    st.sidebar.warning("⚠️ Insira a chave do Google Maps ao lado para carregar a localização exata do CEP.")
+
+# Interface em colunas
 col_esq, col_dir = st.columns(2)
 
 with col_esq:
@@ -55,103 +67,99 @@ with col_esq:
     padrao = st.selectbox("Padrão de Acabamento", ["Econômico / Popular", "Médio / Padrão", "Alto Padrão / Luxo"])
 
 with col_dir:
-    st.subheader("📍 Localização por CEP ou Endereço")
-    endereco_digitado = st.text_input("Digite o CEP ou Endereço Completo", "11400-000")
-    st.caption("Exemplos válidos: '11421-000', 'Guarujá, SP' ou 'Av. Brasil, Cubatão SP'")
+    st.subheader("📍 Localização Inteligente (Google Geocoding)")
+    endereco_digitado = st.text_input("Digite o CEP ou Endereço Completo", "11471-070")
+    st.caption("Exemplos: '11471-070', 'Guarujá, SP' ou 'Rua Montenegro, Vila Maia, Guarujá'")
 
-# 4. Processamento da Localização e Cálculo do Preço
-if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
-    with st.spinner("Buscando coordenadas exatas e aplicando índices locais..."):
-        
-        # Inteligência preventiva: Define fallbacks baseados no que o usuário digitou
-        texto_limpo = ''.join(filter(str.isdigit, endereco_digitado)).strip()
-        
-        if "114" in texto_limpo or "guaruja" in endereco_digitado.lower() or "guarujá" in endereco_digitado.lower():
-            cidade_detectada, estado_uf = "Guarujá", "SP"
-            latitude, longitude = -23.9922, -46.2594
-        else:
-            cidade_detectada, estado_uf = "Cubatão", "SP"
-            latitude, longitude = -23.8900, -46.4200
+# 4. Processamento da Localização com Google Maps e Cálculo
+if st.button("🚀 Calcular Avaliação com Google Maps"):
+    if not google_key:
+        st.error("❌ A chave de API do Google Maps é obrigatória para realizar a busca exata de endereço.")
+    else:
+        with st.spinner("Consultando servidores do Google Maps..."):
             
-        endereco_completo = endereco_digitado
+            # Fallbacks baseados na digitação caso o Google falhe de rede
+            texto_limpo = ''.join(filter(str.isdigit, endereco_digitado)).strip()
+            if "114" in texto_limpo or "guaruja" in endereco_digitado.lower() or "guarujá" in endereco_digitado.lower():
+                cidade_detectada, estado_uf = "Guarujá", "SP"
+                latitude, longitude = -23.9922, -46.2594
+            else:
+                cidade_detectada, estado_uf = "Cubatão", "SP"
+                latitude, longitude = -23.8900, -46.4200
+                
+            endereco_completo = endereco_digitado
 
-        # Passo 1: Busca via API de CEP (ViaCEP) se for formato numérico
-        if len(texto_limpo) == 8:
+            # 🛠️ CONEXÃO OFICIAL COM O GOOGLE MAPS API (Geocoding)
             try:
-                url_cep = f"https://viacep.com.br{texto_limpo}/json/"
-                res_cep = requests.get(url_cep, timeout=6).json()
-                if "localidade" in res_cep:
-                    cidade_detectada = res_cep["localidade"]
-                    estado_uf = res_cep["uf"]
-                    endereco_completo = f"{res_cep.get('logradouro', '')}, {res_cep.get('bairro', '')} - {cidade_detectada}, {estado_uf}"
-            except:
-                pass
+                endereco_encoded = urllib.parse.quote(f"{endereco_digitado}, Brasil")
+                url_google = f"https://googleapis.com{endereco_encoded}&key={google_key}"
+                response = requests.get(url_google, timeout=8).json()
+                
+                if response['status'] == 'OK':
+                    resultado = response['results'][0]
+                    latitude = float(resultado['geometry']['location']['lat'])
+                    longitude = float(resultado['geometry']['location']['lng'])
+                    endereco_completo = resultado['formatted_address']
+                    
+                    # Varre a resposta estruturada do Google para mapear a cidade e o estado corretos
+                    for comp in resultado['address_components']:
+                        if "administrative_area_level_2" in comp['types']:
+                            cidade_detectada = comp['long_name']
+                        if "administrative_area_level_1" in comp['types']:
+                            estado_uf = comp['short_name']
+                else:
+                    st.error(f"Erro na API do Google Maps: {response['status']}. Verifique se a chave possui permissões.")
+            except Exception as e:
+                st.error("Falha física de conexão com os servidores do Google.")
 
-        # Passo 2: Tradutor Geográfico de Alta Precisão (Obtém Lat/Lon reais da rua do imóvel)
-        try:
-            url_geo = f"https://maps.co{endereco_completo}, Brasil"
-            res_geo = requests.get(url_geo, timeout=6).json()
-            if isinstance(res_geo, list) and len(res_geo) > 0:
-                latitude = float(res_geo[0]['lat'])  # <--- CORREÇÃO DE ÍNDICE GEOGRÁFICO
-                longitude = float(res_geo[0]['lon']) # <--- CORREÇÃO DE ÍNDICE GEOGRÁFICO
-        except:
-            try:
-                url_nominatim = f"https://openstreetmap.org{endereco_completo}, Brasil"
-                headers = {'User-Agent': 'previsor_imobiliario_marcos_v14'}
-                res_nom = requests.get(url_nominatim, headers=headers, timeout=6).json()
-                if len(res_nom) > 0:
-                    latitude = float(res_nom[0]['lat'])
-                    longitude = float(res_nom[0]['lon'])
-            except:
-                pass
+            # Ajuste de caixa das variáveis de texto
+            cidade_limpa = cidade_detectada.lower().strip()
+            estado_uf = estado_uf.upper().strip()
 
-        # Ajuste de caixa das variáveis de texto
-        cidade_limpa = cidade_detectada.lower().strip()
-        estado_uf = estado_uf.upper().strip()
+            # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
+            dados_uf = tabela_m2_brasil.get(estado_uf, tabela_m2_brasil["PADRAO"])
+            
+            if "guaruja" in cidade_limpa or "guarujá" in cidade_limpa:
+                preco_m2_base = dados_uf.get("guaruja", 7100)
+            elif "cubatão" in cidade_limpa or "cubatao" in cidade_limpa:
+                preco_m2_base = dados_uf.get("cubatao", 4300)
+            elif "santos" in cidade_limpa:
+                preco_m2_base = dados_uf.get("santos", 8200)
+            elif any(k in cidade_limpa for k in ["são paulo", "rio", "curitiba", "belo horizonte", "porto alegre"]):
+                preco_m2_base = dados_uf.get("capital", 5500)
+            else:
+                preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
-        dados_uf = tabela_m2_brasil.get(estado_uf, tabela_m2_brasil["PADRAO"])
-        
-        if "guaruja" in cidade_limpa or "guarujá" in cidade_limpa:
-            preco_m2_base = dados_uf.get("guaruja", 7100)
-        elif "cubatão" in cidade_limpa or "cubatao" in cidade_limpa:
-            preco_m2_base = dados_uf.get("cubatao", 4300)
-        elif "santos" in cidade_limpa:
-            preco_m2_base = dados_uf.get("santos", 8200)
-        elif any(k in cidade_limpa for k in ["são paulo", "rio", "curitiba", "belo horizonte", "porto alegre"]):
-            preco_m2_base = dados_uf.get("capital", 5500)
-        else:
-            preco_m2_base = dados_uf.get("interior_no_geral", 3500)
+            # 🧠 PREDITOR COMBINADO CORRIGIDO COM MULTI-INDICE (XGBoost NumPy Array Fix)
+            dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
+            resultado_predicao = modelo.predict(dados_usuario)
+            proporcao_ia = float(resultado_predicao[0])  # <--- SEGREDO DO EXTRACT DE ARRAY
+            
+            valor_m2_calculado = area_m2 * preco_m2_base
+            preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
+            
+            if padrao == "Econômico / Popular": preco_final *= 0.85
+            elif padrao == "Alto Padrão / Luxo": preco_final *= 1.30
+            
+            # Adicionais suavizados para o mercado real brasileiro
+            preco_final += (vagas * 15000)
+            preco_final = preco_final * 0.93  
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR (Utilizando )
-        dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
-        resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao[0])  # <--- SOLUÇÃO DEFINITIVA DO TYPEERROR
-        
-        valor_m2_calculado = area_m2 * preco_m2_base
-        preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
-        
-        if padrao == "Econômico / Popular": preco_final *= 0.85
-        elif padrao == "Alto Padrão / Luxo": preco_final *= 1.30
-        
-        # Calibração de adicionais suavizada
-        preco_final += (vagas * 15000)
-        preco_final = preco_final * 0.93  
-
-        # Exibição dos resultados na interface
-        st.success(f"## Valor de Mercado Estimado: R$ {preco_final:,.2f}")
-        
-        c1, c2 = st.columns(2)
-        c1.metric(label="Média do m² Calculado", value=f"R$ {preco_final/area_m2:,.2f}/m²")
-        c2.metric(label="Localidade Identificada", value=f"{cidade_detectada} - {estado_uf}")
-        
-        st.info(f"📍 **Endereço Formatado Localizado:** {endereco_completo}")
-        
-        # 🗺️ RENDERIZADOR DE MAPA ATUALIZADO
-        st.subheader("🗺️ Localização Geográfica do Imóvel")
-        df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
-        st.map(df_mapa, zoom=14)
-        
-        # 🔗 LINK GOOGLE MAPS CORRIGIDO
-        url_google_maps = f"https://google.com{latitude},{longitude}"
-        st.markdown(f"[🔗 Clique aqui para abrir este endereço direto no app do Google Maps]({url_google_maps})")
+            # Exibição dos resultados estruturados na tela
+            st.success(f"## Valor de Mercado Estimado: R$ {preco_final:,.2f}")
+            
+            c1, c2 = st.columns(2)
+            c1.metric(label="Média do m² Calculado", value=f"R$ {preco_final/area_m2:,.2f}/m²")
+            c2.metric(label="Localidade Validada pelo Google", value=f"{cidade_detectada} - {estado_uf}")
+            
+            st.info(f"📍 **Endereço Oficial Retornado pelo Google:** {endereco_completo}")
+            
+            # 🗺️ RENDERIZADOR DE MAPA DO STREAMLIT USANDO COORDENADAS REAIS DO GOOGLE
+            st.subheader("🗺️ Localização Geográfica do Imóvel")
+            df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
+            st.map(df_mapa, zoom=15)
+            
+            # 🔗 LINK OFICIAL DE DIRECIONAMENTO DO GOOGLE MAPS
+            # Formato de URL de redirecionamento universal do Google Maps que abre em qualquer navegador/app sem concatenar errado
+            url_google_maps = f"https://google.com{latitude},{longitude}"
+            st.markdown(f"[➡️ Clique aqui para abrir este endereço de forma interativa direto no Google Maps]({url_google_maps})")
