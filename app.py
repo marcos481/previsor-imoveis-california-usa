@@ -94,18 +94,16 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
 
         # Passo 2: Busca de coordenadas geográficas gratuita baseada no endereço formatado
         try:
-            # Codifica o texto para evitar erros de acentuação na URL pública do OpenStreetMap
             endereco_url = urllib.parse.quote(f"{endereco_completo}, Brasil")
             url_nominatim = f"https://openstreetmap.org{endereco_url}"
-            headers_seguros = {'User-Agent': 'previsor_imobiliario_marcos_final_v16'}
+            headers_seguros = {'User-Agent': 'previsor_imobiliario_marcos_final_v17'}
             res_nom = requests.get(url_nominatim, headers=headers_seguros, timeout=5).json()
             
             if isinstance(res_nom, list) and len(res_nom) > 0:
-                # Extrai a primeira coordenada da lista retornada pelo servidor de mapas público
                 latitude = float(res_nom[0]['lat'])
                 longitude = float(res_nom[0]['lon'])
         except:
-            pass # Mantém as coordenadas de segurança geradas no início do bloco se a rede falhar
+            pass
 
         # Ajuste técnico de texto para cruzamento de preço por m²
         cidade_limpa = cidade_detectada.lower().strip()
@@ -125,10 +123,10 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEEROR (Uso obrigatório de)
+        # 🧠 PREDITOR COMBINADO COM EXTRAÇÃO DE ARRAY CORRETA [0]
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao[0])  # Blindagem definitiva contra erros de array
+        proporcao_ia = float(resultado_predicao[0])  # <--- Travado com [0] para nunca dar TypeError
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -154,7 +152,7 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
         df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_mapa, zoom=14)
         
-        # 🔗 LINK GOOGLE MAPS GRATUITO: Usa a API de busca por texto livre que não cobra nada e abre direto no app
-        endereco_busca_google = urllib.parse.quote(f"{endereco_completo}, Brasil")
-        url_google_maps = f"https://google.com{endereco_busca_google}"
+        # 🔗 LINK GOOGLE MAPS DEFINITIVO E SEGURO:
+        # Usa estritamente latitude e longitude reais separadas por vírgula. Evita erros de colagem de texto.
+        url_google_maps = f"https://google.com{latitude},{longitude}"
         st.markdown(f"[➡️ Clique aqui para abrir este endereço de forma interativa direto no Google Maps]({url_google_maps})")
