@@ -71,21 +71,19 @@ with col_dir:
     if opcao_busca == "Por CEP ou Endereço escrito":
         endereco_digitado = st.text_input("Digite o CEP, Rua ou Cidade (Ex: Jardim Casqueiro, Cubatão SP)", "Cubatão, SP")
     else:
-        # Valores iniciais ajustados direto para a Baixada Santista para evitar o ponto zero do mapa
         latitude = st.number_input("Latitude", value=-23.8900, format="%.4f")
         longitude = st.number_input("Longitude", value=-46.4200, format="%.4f")
 
 # 4. Processamento da Localização e Cálculo do Preço
 if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
     with st.spinner("Buscando dados geográficos e aplicando índices locais..."):
-        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v4")
+        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v5")
         cidade = ""
         estado_uf = ""
         endereco_completo = ""
         
         try:
             if opcao_busca == "Por CEP ou Endereço escrito" and endereco_digitado:
-                # 🔒 CORREÇÃO CRÍTICA: country_codes='BR' força o mapa a buscar APENAS no Brasil
                 loc = geolocator.geocode(endereco_digitado, addressdetails=True, country_codes='BR', timeout=10)
                 if loc:
                     latitude, longitude = loc.latitude, loc.longitude
@@ -130,10 +128,10 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO
+        # 🧠 PREDITOR COMBINADO CORRIGIDO COM [0]
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao)
+        proporcao_ia = float(resultado_predicao[0])  # <--- SOLUÇÃO DEFINITIVA DO TYPEERROR
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -155,7 +153,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         
         st.info(f"📍 **Endereço Completo no Mapa:** {endereco_completo if endereco_completo else 'Busca por coordenadas locais.'}")
         
-        # 🗺️ VISUALIZADOR DE MAPA: Mostra exatamente onde o imóvel está no Brasil
+        # 🗺️ VISUALIZADOR DE MAPA
         st.subheader("🗺️ Verificação Visual de Localização")
         df_mapa = pd.DataFrame({'lat': [latitude], 'lon': [longitude]})
         st.map(df_mapa)
