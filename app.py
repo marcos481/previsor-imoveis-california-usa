@@ -3,7 +3,6 @@ import pandas as pd
 import xgboost as xgb
 import io
 import requests
-import urllib.parse
 
 # 1. Configuração visual do site
 st.set_page_config(page_title="Previsor Imobiliário Brasil Pro", page_icon="🏠", layout="wide")
@@ -33,7 +32,7 @@ def treinar_ia_nacional():
 with st.spinner("Inicializando motores de cálculo..."):
     modelo = treinar_ia_nacional()
 
-# Tabela dinâmica de valor do m² médio por Estado/Capital/Cidade (Mercado Real 2026)
+# Tabela dinâmica de valor do m² médio por Estado/Capital/Cidade (Mercado Real)
 tabela_m2_brasil = {
     "SP": {"capital": 10200, "interior_no_geral": 5400, "cubatao": 4300, "guaruja": 7100, "santos": 8200},
     "RJ": {"capital": 10100, "interior_no_geral": 4800},
@@ -93,16 +92,16 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
             url_geo = f"https://maps.co{endereco_completo}, Brasil"
             res_geo = requests.get(url_geo, timeout=6).json()
             if isinstance(res_geo, list) and len(res_geo) > 0:
-                latitude = float(res_geo[0]['lat'])
-                longitude = float(res_geo[0]['lon'])
+                latitude = float(res_geo['lat'])
+                longitude = float(res_geo['lon'])
         except:
             try:
                 url_nominatim = f"https://openstreetmap.org{endereco_completo}, Brasil"
-                headers = {'User-Agent': 'previsor_imobiliario_marcos_v12'}
+                headers = {'User-Agent': 'previsor_imobiliario_marcos_v13'}
                 res_nom = requests.get(url_nominatim, headers=headers, timeout=6).json()
                 if len(res_nom) > 0:
-                    latitude = float(res_nom[0]['lat'])
-                    longitude = float(res_nom[0]['lon'])
+                    latitude = float(res_nom['lat'])
+                    longitude = float(res_nom['lon'])
             except:
                 pass
 
@@ -124,10 +123,10 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO COM [0] CONTRA TYPEEROR
+        # 🧠 PREDITOR COMBINADO CORRIGIDO CONTRA TYPEERROR
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao[0])  # <--- SOLUÇÃO DEFINITIVA DO SCRIPT
+        proporcao_ia = float(resultado_predicao)  # Correção definitiva de array
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -153,7 +152,6 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_mapa, zoom=14)
         
-        # 🔗 LINK GOOGLE MAPS CORRIGIDO: Codifica o texto do endereço perfeitamente
-        endereco_codificado = urllib.parse.quote(f"{endereco_completo}, Brasil")
-        url_google_maps = f"https://google.com{endereco_codificado}"
+        # 🔗 LINK GOOGLE MAPS CORRIGIDO: Formato de busca por coordenadas isoladas com a barra '/' correta
+        url_google_maps = f"https://google.com{latitude},{longitude}"
         st.markdown(f"[🔗 Clique aqui para abrir este endereço direto no app do Google Maps]({url_google_maps})")
