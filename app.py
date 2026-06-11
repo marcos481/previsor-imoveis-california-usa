@@ -67,7 +67,7 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
         # Limpeza do input para checar se é um CEP numérico
         texto_limpo = ''.join(filter(str.isdigit, endereco_digitado)).strip()
         
-        # 🛡️ BANCO DE DADOS LOCAL DE CONTINGÊNCIA IMEDIATA (Evita o aviso de erro na tela se a internet cair)
+        # BANCO DE DADOS LOCAL DE CONTINGÊNCIA IMEDIATA
         if "114" in texto_limpo or "guaruja" in endereco_digitado.lower() or "guarujá" in endereco_digitado.lower():
             cidade_detectada, estado_uf = "Guarujá", "SP"
             latitude, longitude = -23.9922, -46.2594
@@ -85,7 +85,7 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
             latitude, longitude = -23.5505, -46.6333
             endereco_completo = endereco_digitado
 
-        # Passo 1: Tenta enriquecer por API de CEP (Apenas se não houver bloqueio do servidor)
+        # Passo 1: Tenta enriquecer por API de CEP (ViaCEP) de forma silenciosa
         if len(texto_limpo) == 8:
             try:
                 url_cep = f"https://viacep.com.br{texto_limpo}/json/"
@@ -95,18 +95,18 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
                     estado_uf = res_cep["uf"]
                     endereco_completo = f"{res_cep.get('logradouro', '')}, {res_cep.get('bairro', '')} - {cidade_detectada}, {estado_uf}"
             except:
-                pass # Ignora silenciosamente e usa o banco local de contingência acima
+                pass 
 
         # Passo 2: Busca de coordenadas geográficas via satélite
         try:
             endereco_url = urllib.parse.quote(f"{endereco_completo}, Brasil")
             url_nominatim = f"https://openstreetmap.org{endereco_url}"
-            headers_seguros = {'User-Agent': 'previsor_imobiliario_marcos_final_v18'}
+            headers_seguros = {'User-Agent': 'previsor_imobiliario_marcos_final_v19'}
             res_nom = requests.get(url_nominatim, headers=headers_seguros, timeout=3).json()
             
             if isinstance(res_nom, list) and len(res_nom) > 0:
-                latitude = float(res_nom['lat'])
-                longitude = float(res_nom['lon'])
+                latitude = float(res_nom[0]['lat'])
+                longitude = float(res_nom[0]['lon'])
         except:
             pass
 
@@ -128,10 +128,10 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO COM EXTRAÇÃO DE ARRAY
+        # 🧠 PREDITOR COMBINADO CORRIGIDO EM ADICIONANDO O ÍNDICE [0]
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao)  # <--- Fix do array mantido de forma segura
+        proporcao_ia = float(resultado_predicao[0])  # <--- CORREÇÃO DEFINITIVA DO TYPEERROR
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -157,6 +157,6 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
         df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_mapa, zoom=14)
         
-        # 🔗 LINK GOOGLE MAPS DEFINITIVO POR COORDENADAS (Sem quebras de URL)
+        # 🔗 LINK GOOGLE MAPS DEFINITIVO POR COORDENADAS
         url_google_maps = f"https://google.com{latitude},{longitude}"
         st.markdown(f"[➡️ Clique aqui para abrir este endereço de forma interativa direto no Google Maps]({url_google_maps})")
