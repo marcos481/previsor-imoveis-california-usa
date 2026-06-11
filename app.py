@@ -12,8 +12,7 @@ st.markdown("Insira as características do imóvel para estimar o valor de merca
 # 2. Base de dados inteligente calibrada com valores de m² reais de mercado
 @st.cache_resource
 def treinar_ia_com_dados_reais():
-    # Histórico expandido e calibrado com o mercado real paulista (m² médio regional)
-    # Inclui pontos da Capital (Zonas Central, Oeste, Sul, Leste) e Baixada Santista (Santos, SV, Guarujá, Praia Grande)
+    # Base de dados limpa e expandida para criar a tendência do modelo
     texto_dados = """area_m2,quartos,vagas,latitude,longitude,preco_reais
 50,1,0,-23.99,-46.42,240000
 65,2,1,-23.98,-46.43,320000
@@ -44,12 +43,10 @@ def treinar_ia_com_dados_reais():
     X = dados_mercado[['area_m2', 'quartos', 'vagas', 'latitude', 'longitude']]
     y = dados_mercado['preco_reais']
     
-    # Ajuste fino dos hiperparâmetros para evitar distorções bruscas com poucos dados
     modelo_ia = xgb.XGBRegressor(
-        n_estimators=100, 
-        learning_rate=0.08, 
+        n_estimators=80, 
+        learning_rate=0.05, 
         max_depth=3, 
-        min_child_weight=1,
         random_state=42
     )
     modelo_ia.fit(X, y)
@@ -65,61 +62,63 @@ quartos = st.sidebar.slider("Quantidade de Quartos", 1, 4, 2)
 vagas = st.sidebar.slider("Vagas de Garagem", 0, 3, 1)
 
 st.sidebar.header("Localização Geográfica")
-latitude = st.sidebar.slider("Latitude (Região SP/Litoral)", -24.05, -23.40, -23.96, step=0.01)
-longitude = st.sidebar.slider("Longitude (Região SP/Litoral)", -46.75, -46.20, -46.32, step=0.01)
+# Limites estendidos para cobrir Cubatão, Santos, São Vicente e SP Capital de forma segura
+latitude = st.sidebar.slider("Latitude (Região SP/Litoral)", -24.10, -23.40, -23.89, step=0.01)
+longitude = st.sidebar.slider("Longitude (Região SP/Litoral)", -46.75, -46.15, -46.42, step=0.01)
 
-# 4. Executa a previsão nacional e busca o endereço real
+# 4. Executa a previsão e aplica a calibração por cidade real
 if st.button("Calcular Preço Estimado"):
     bairro_detectado = ""
     cidade_detectada = ""
+    endereco_completo = ""
     
     try:
-        geolocator = Nominatim(user_agent="previsor_imoveis_marcos_v2")
+        geolocator = Nominatim(user_agent="previsor_imoveis_marcos_v3")
         localizacao = geolocator.reverse(f"{latitude}, {longitude}", timeout=10)
         endereco_completo = localizacao.address
         
-        # Extrai detalhes de localização para aplicar inteligência de negócios
         detalhes_endereco = localizacao.raw.get('address', {})
         bairro_detectado = detalhes_endereco.get('suburb', '')
-        cidade_detectada = detalhes_endereco.get('city', detalhes_endereco.get('town', ''))
+        # Detecta cidade ou município de forma precisa
+        cidade_detectada = detalhes_endereco.get('city', detalhes_endereco.get('town', detalhes_endereco.get('municipality', ''))).strip()
     except:
-        endereco_completo = "Endereço localizado na Região Metropolitana ou Litoral de SP."
+        endereco_completo = "Endereço localizado por coordenadas na Baixada Santista / SP."
 
-    # Executa a previsão base do XGBoost
+    # Executa a previsão matemática base do XGBoost
     dados_usuario = pd.DataFrame([[area_m2, quartos, vagas, latitude, longitude]], 
                                  columns=['area_m2', 'quartos', 'vagas', 'latitude', 'longitude'])
     resultado_ia = modelo.predict(dados_usuario)
     preco_base = float(resultado_ia[0])
 
-    # 💎 TRAVA DE PREÇO REAL DE MERCADO (Fator CUB-SP + Valorização de Terreno)
-    # Evita que bairros nobres sofram subestimação e bairros periféricos caiam abaixo do custo de obra
-    # Custo de construção base + fração ideal de terreno estimada por m² na região
-    if -23.65 <= latitude <= -23.45 and -46.75 <= longitude <= -46.55:
-        # Zona nobre/central da Capital paulista possui m² muito valorizado
-        preco_minimo_metro = 8500
-    elif -23.99 <= latitude <= -23.94 and -46.35 <= longitude <= -46.28:
-        # Orla de Santos / Ponta da Praia / Gonzaga
-        preco_minimo_metro = 7500
-    else:
-        # Outras regiões da Baixada Santista e periferia da Capital
-        preco_minimo_metro = 4900
-
-    custo_minimo_mercado = area_m2 * preco_minimo_metro
+    # 🗺️ TABELA DE PREÇOS REAIS POR METRO QUADRADO (MÉDIA DE MERCADO 2026)
+    # Evita distorções de modelos matemáticos que cruzam fronteiras de cidades vizinhas
+    tabela_m2_cidades = {
+        "Cubatão": 4200.0,
+        "São Vicente": 4900.0,
+        "Praia Grande": 5200.0,
+        "Santos": 8200.0,
+        "Guarujá": 7100.0,
+        "São Paulo": 9800.0
+    }
     
-    # Agrega o valor comercial das vagas de garagem (médias de mercado)
-    valor_adicional_vagas = vagas * 35000
-    custo_total_referencia = custo_minimo_mercado + valor_adicional_vagas
-
-    # Se a predição matemática do XGBoost flutuar para baixo devido à falta de dados vizinhos, a trava comercial corrige
-    if preco_base < custo_total_referencia:
-        preco_final = custo_total_referencia
-    else:
-        # Aplica uma correção sutil de inflação de mercado sobre o modelo linearizado
-        preco_final = preco_base * 1.05
+    # Identifica o preço de m² da cidade ou assume uma média regional se falhar
+    preco_m2_referencia = tabela_m2_cidades.get(cidade_detectada, 5500.0)
+    
+    # Se o modelo matemático disparar por causa de vizinhos caros (como Santos), a gente trava no limite da cidade
+    custo_mercado_local = area_m2 * preco_m2_referencia
+    valor_adicional_vagas = vagas * 25000
+    
+    # Preço calculado com base estrita no comportamento do m² da própria cidade
+    preco_real_calculado = custo_mercado_local + valor_adicional_vagas
+    
+    # Média ponderada para suavizar o modelo: 80% peso da cidade real e 20% dinâmica do modelo XGBoost
+    preco_final = (preco_real_calculado * 0.80) + (preco_base * 0.20)
 
     # Exibição dos resultados estruturados na tela
     st.success(f"### Valor de Mercado Estimado: R$ {preco_final:,.2f}")
     st.metric(label="Preço Médio por m² nesta simulação", value=f"R$ {preco_final/area_m2:,.2f}/m²")
     
     st.subheader("📍 Localização do Imóvel:")
-    st.info(f"**Endereço:** {endereco_completo}")
+    if cidade_detectada:
+        st.write(f"**Cidade Identificada:** {cidade_detectada} | **Bairro:** {bairro_detectado}")
+    st.info(f"**Endereço Completo:** {endereco_completo}")
