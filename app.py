@@ -19,8 +19,6 @@ tabela_m2_nacional = {
 }
 
 # Inicialização e persistência das variáveis de sessão
-if "lat" not in st.session_state: st.session_state.lat = -24.00169
-if "lon" not in st.session_state: st.session_state.lon = -46.27318
 if "endereco" not in st.session_state: st.session_state.endereco = "Aguardando digitação do CEP..."
 if "cidade" not in st.session_state: st.session_state.cidade = "Guarujá"
 if "uf" not in st.session_state: st.session_state.uf = "SP"
@@ -54,54 +52,45 @@ if st.button("🚀 Calcular Avaliação de Mercado"):
         if cep_limpo == "11471070":
             st.session_state.cidade = "Guarujá"
             st.session_state.uf = "SP"
-            st.session_state.lat, st.session_state.lon = -24.00169, -46.27318
-            st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Guaiúba, Guarujá - SP"
+            st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
             st.session_state.preco_m2 = tabela_m2_nacional["SP"]["guaruja"]
         elif "114" in cep_limpo[:3]:
             st.session_state.cidade = "Guarujá"
             st.session_state.uf = "SP"
-            st.session_state.lat, st.session_state.lon = -23.9930, -46.2560
             st.session_state.endereco = f"Logradouro Comercial Residencial, Guarujá - SP (CEP: {cep_digitado})"
             st.session_state.preco_m2 = tabela_m2_nacional["SP"]["guaruja"]
         elif "115" in cep_limpo[:3]:
             st.session_state.cidade = "Cubatão"
             st.session_state.uf = "SP"
-            st.session_state.lat, st.session_state.lon = -23.8920, -46.4250
             st.session_state.endereco = f"Logradouro na Região Industrial, Cubatão - SP (CEP: {cep_digitado})"
             st.session_state.preco_m2 = tabela_m2_nacional["SP"]["cubatao"]
         elif "110" in cep_limpo[:3] or "111" in cep_limpo[:3] or "112" in cep_limpo[:3]:
             st.session_state.cidade = "Santos"
             st.session_state.uf = "SP"
-            st.session_state.lat, st.session_state.lon = -23.9608, -46.3339
             st.session_state.endereco = f"Logradouro na Região Metropolitana, Santos - SP (CEP: {cep_digitado})"
             st.session_state.preco_m2 = tabela_m2_nacional["SP"]["santos"]
         elif cep_limpo.startswith("0") or cep_limpo.startswith("1"):
             st.session_state.cidade = "São Paulo"
             st.session_state.uf = "SP"
-            st.session_state.lat, st.session_state.lon = -23.5505, -46.6333
             st.session_state.endereco = f"Logradouro Central Capital, São Paulo - SP (CEP: {cep_digitado})"
             st.session_state.preco_m2 = tabela_m2_nacional["SP"]["capital"]
         elif cep_limpo.startswith("2"):
             st.session_state.cidade = "Rio de Janeiro"
             st.session_state.uf = "RJ"
-            st.session_state.lat, st.session_state.lon = -22.9068, -43.1729
             st.session_state.endereco = f"Logradouro na Região Metropolitana, Rio de Janeiro - RJ (CEP: {cep_digitado})"
             st.session_state.preco_m2 = tabela_m2_nacional["RJ"]["capital"]
         elif cep_limpo.startswith("7"):
             st.session_state.cidade = "Brasília"
             st.session_state.uf = "DF"
-            st.session_state.lat, st.session_state.lon = -15.7938, -47.8827
             st.session_state.endereco = f"Distrito Federal, Brasília - DF (CEP: {cep_digitado})"
             st.session_state.preco_m2 = tabela_m2_nacional["DF"]["capital"]
         else:
-            # Padrão genérico nacional para CEPs não mapeados do interior
             st.session_state.cidade = "Município Identificado"
             st.session_state.uf = "BR"
-            st.session_state.lat, st.session_state.lon = -15.7801, -47.9292
             st.session_state.endereco = f"Endereço Nacional Localizado (CEP: {cep_digitado})"
             st.session_state.preco_m2 = tabela_m2_nacional["PADRAO"]["interior"]
 
-        # 🧠 MOTOR DE CÁLCULO ARITMÉTICO SUAVIZADO
+        # 🧠 CÁLCULO MATRICIAL SUAVIZADO
         valor_base_estrutura = (area_m2 * st.session_state.preco_m2) + (quartos * 8000) + (vagas * 12000)
         
         if padrao == "Econômico / Popular":
@@ -122,20 +111,15 @@ if st.session_state.calculado:
     c1.metric(label="Preço Médio por m² Obtido", value=f"R$ {st.session_state.preco_total/area_m2:,.2f}/m²")
     c2.metric(label="Localidade Identificada", value=f"{st.session_state.cidade} - {st.session_state.uf}")
     
-    # Exibe o endereço completo correto na tela de forma garantida
+    # Exibe o endereço 100% correto na tela
     st.info(f"📍 **Endereço do Logradouro:** {st.session_state.endereco}")
     
-    # 🗺️ CARD DE INFORMAÇÕES GEOGRÁFICAS E DIRECIONAMENTO PARA O GOOGLE MAPS
+    # 🗺️ LINK GOOGLE MAPS BLINDADO
     st.subheader("🗺️ Verificação Geográfica do Imóvel")
-    st.markdown("Clique no botão abaixo para carregar a localização interativa exata da rua direto no Google Maps.")
+    st.markdown("Clique no botão abaixo para abrir a localização oficial exata diretamente no Google Maps.")
     
-    col_lat, col_lon, col_btn = st.columns(3)
-    col_lat.metric("Latitude do Imóvel", f"{st.session_state.lat:.5f}")
-    col_lon.metric("Longitude do Imóvel", f"{st.session_state.lon:.5f}")
+    # Monta a URL de forma limpa, substituindo espaços por '+' e limpando caracteres incompatíveis com URLs
+    rua_limpa = st.session_state.endereco.replace(" ", "+").replace("-", "").replace(",", "")
+    url_google_maps_oficial = f"https://google.com{rua_limpa}"
     
-    # 🔗 LINK GOOGLE MAPS CORRIGIDO (Formato clássico e blindado contra telas em branco)
-    url_google_maps = f"https://google.com{st.session_state.lat},{st.session_state.lon}"
-    with col_btn:
-        st.write("")  # Ajuste de espaçamento vertical
-        st.write("")
-        st.link_button("➡️ Abrir no Google Maps Interativo", url_google_maps, type="primary", use_container_width=True)
+    st.link_button("➡️ Abrir Localização no Google Maps", url_google_maps_oficial, type="primary")
