@@ -32,16 +32,15 @@ def treinar_ia_nacional():
     modelo_ia.fit(X, y)
     return modelo_ia
 
-with st.spinner("Inicializando motores de cálculo nacionais..."):
+with st.spinner("Analisando mercado e inicializando motores de cálculo nacionais..."):
     modelo = treinar_ia_nacional()
 
 # Tabela dinâmica de valor do m² médio por Estado/Capital (Referência de Mercado)
-# Valores calibrados para a realidade de mercado refletindo variações regionais
 tabela_m2_brasil = {
     "SP": {"capital": 10200, "interior_no_geral": 5400, "cubatao": 4300},
     "RJ": {"capital": 10100, "interior_no_geral": 4800},
     "DF": {"capital": 8900, "interior_no_geral": 5200},
-    "SC": {"capital": 11000, "interior_no_geral": 6500}, # Balneário Camboriú / Itapema puxam para cima
+    "SC": {"capital": 11000, "interior_no_geral": 6500},
     "PR": {"capital": 7800, "interior_no_geral": 4500},
     "MG": {"capital": 7900, "interior_no_geral": 4200},
     "RS": {"capital": 6800, "interior_no_geral": 4100},
@@ -54,7 +53,7 @@ tabela_m2_brasil = {
 }
 
 # 3. Interface em colunas
-col_esq, col_dir = st.columns([1, 1])
+col_esq, col_dir = st.columns(2)
 
 with col_esq:
     st.subheader("📐 Características do Imóvel")
@@ -73,13 +72,13 @@ with col_dir:
     if opcao_busca == "Por CEP ou Endereço escrito":
         endereco_digitado = st.text_input("Digite o CEP, Rua ou Cidade (Ex: Jardim Casqueiro, Cubatão SP)", "Cubatão, SP")
     else:
-        latitude = st.number_input("Latitude", value=-23.890, format="%.4f")
-        longitude = st.number_input("Longitude", value=-46.420, format="%.4f")
+        latitude = st.number_input("Latitude", value=-23.8900, format="%.4f")
+        longitude = st.number_input("Longitude", value=-46.4200, format="%.4f")
 
 # 4. Processamento da Localização e Cálculo do Preço
 if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
     with st.spinner("Buscando dados geográficos e aplicando índices locais..."):
-        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v1")
+        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v3")
         cidade = ""
         estado_uf = ""
         endereco_completo = ""
@@ -93,9 +92,8 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
                     endereco_completo = loc.address
                     detalhes = loc.raw.get('address', {})
                     cidade = detalhes.get('city', detalhes.get('town', detalhes.get('municipality', '')))
-                    estado_uf = detalhes.get('state_code', '').upper()
+                    estado_uf = detalhes.get('state_code', '').upper() if detalhes.get('state_code') else ""
                     if not estado_uf and 'state' in detalhes:
-                        # Fallback se não vier a sigla direta
                         estado_uf = detalhes.get('state', '')
             else:
                 loc = geolocator.reverse(f"{latitude}, {longitude}", addressdetails=True, timeout=10)
@@ -103,19 +101,24 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
                     endereco_completo = loc.address
                     detalhes = loc.raw.get('address', {})
                     cidade = detalhes.get('city', detalhes.get('town', detalhes.get('municipality', '')))
-                    estado_uf = detalhes.get('state_code', '').upper()
+                    estado_uf = detalhes.get('state_code', '').upper() if detalhes.get('state_code') else ""
+                    if not estado_uf and 'state' in detalhes:
+                        estado_uf = detalhes.get('state', '')
         except:
             st.warning("⚠️ Falha temporária ao conectar ao mapa. Usando aproximação padrão regional.")
 
         # Limpeza rápida de nomes de cidades e estados
-        cidade_limpa = cidade.lower().strip() if cidade else ""
+        cidade_limpa = str(cidade).lower().strip() if cidade else ""
+        estado_uf = str(estado_uf).upper().strip() if estado_uf else "SP"
         
-        # Tratamento simplificado de UF se vier o nome completo do estado
+        # Tratamento de segurança se vir o nome completo do estado por extenso
         if len(estado_uf) > 2:
-            mapeamento_estados = {"são paulo": "SP", "rio de janeiro": "RJ", "minas gerais": "MG"}
-            estado_uf = mapeamento_estados.get(estado_uf.lower(), "SP")
-        if not estado_uf: 
-            estado_uf = "SP" # Fallback prudente
+            if "paulo" in estado_uf.lower(): estado_uf = "SP"
+            elif "rio" in estado_uf.lower(): estado_uf = "RJ"
+            elif "minas" in estado_uf.lower(): estado_uf = "MG"
+            elif "santa" in estado_uf.lower(): estado_uf = "SC"
+            elif "paraná" in estado_uf.lower() or "parana" in estado_uf.lower(): estado_uf = "PR"
+            else: estado_uf = "SP"
 
         # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
         dados_uf = tabela_m2_brasil.get(estado_uf, tabela_m2_brasil["PADRAO"])
@@ -124,19 +127,19 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         if "cubatão" in cidade_limpa:
             preco_m2_base = dados_uf.get("cubatao", 4300)
         elif cidade_limpa and any(k in cidade_limpa for k in ["são paulo", "rio de janeiro", "curitiba", "belo horizonte", "porto alegre", "recife", "salvador", "fortaleza", "brasília"]):
-            preco_m2_base = dados_uf.get("capital")
+            preco_m2_base = dados_uf.get("capital", 5500)
         else:
-            preco_m2_base = dados_uf.get("interior_no_geral")
+            preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO
-        # XGBoost calcula a proporção do valor pelo tamanho e distribuição de cômodos
+        # 🧠 PREDITOR COMBINADO CORRIGIDO (Extraindo o valor do Array com)
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
-        proporcao_ia = float(modelo.predict(dados_usuario))
+        resultado_predicao = modelo.predict(dados_usuario)
+        proporcao_ia = float(resultado_predicao[0])  # Fix do TypeError garantido
         
         # Preço base estruturado no m² comercial real do município atual
         valor_m2_calculado = area_m2 * preco_m2_base
         
-        # Agrega o peso das variáveis físicas tratadas pelo modelo
+        # Agrega o peso das variáveis físicas tratadas pelo modelo (70% peso do m² real da cidade, 30% comportamento da IA)
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
         
         # Multiplicadores de padrão de acabamento
@@ -145,7 +148,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         elif padrao == "Alto Padrão / Luxo":
             preco_final *= 1.30
 
-        # Adiciona valor de mercado por vaga de garagem extra comercializável
+        # Adiciona valor de mercado por vaga de garagem comercializável
         preco_final += (vagas * 20000)
 
         # Exibição Analítica dos Resultados na Tela
