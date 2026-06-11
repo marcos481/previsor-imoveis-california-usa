@@ -114,13 +114,12 @@ if st.button("🚀 Calcular Avaliação do CEP"):
                 st.session_state.lon = float(dados_regiao["lon"])
                 st.session_state.cidade = dados_regiao["nome"]
                 st.session_state.uf = estado_uf
-                st.session_state.endereco = f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
+                st.session_state.endereco = f"Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP" if "11471070" in cep_limpo else f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
                 preco_m2_base = dados_regiao["capital"]
 
                 # Regras para microrregiões específicas de SP
                 if estado_uf == "SP":
                     if "11471070" in cep_limpo:
-                        st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
                         st.session_state.lat = float(-24.00169)
                         st.session_state.lon = float(-46.27318)
                         preco_m2_base = dados_regiao["guaruja"]
@@ -155,5 +154,6 @@ if st.session_state.calculado:
     c2.metric(label="Estado / Região Identificada", value=f"{st.session_state.cidade} ({st.session_state.uf})")
     st.info(f"📍 **Endereço do Logradouro:** {st.session_state.endereco}")
     
-    # 🗺️ RENDERIZADOR DE MAPA NATIVO DO STREAMLIT (Dicionário de dados fechado corretamente)
+    # 🗺️ CORREÇÃO CRÍTICA DO MAPA NATIVO DO STREAMLIT: Exige colunas estritamente com os nomes 'lat' e 'lon'
     st.subheader("🗺️ Localização Geográfica do Imóvel")
+    df_mapa = pd.DataFrame({
