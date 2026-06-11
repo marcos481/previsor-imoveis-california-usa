@@ -93,16 +93,16 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
             url_geo = f"https://maps.co{endereco_completo}, Brasil"
             res_geo = requests.get(url_geo, timeout=6).json()
             if isinstance(res_geo, list) and len(res_geo) > 0:
-                latitude = float(res_geo['lat'])
-                longitude = float(res_geo['lon'])
+                latitude = float(res_geo[0]['lat'])
+                longitude = float(res_geo[0]['lon'])
         except:
             try:
                 url_nominatim = f"https://openstreetmap.org{endereco_completo}, Brasil"
-                headers = {'User-Agent': 'previsor_imobiliario_marcos_v11'}
+                headers = {'User-Agent': 'previsor_imobiliario_marcos_v12'}
                 res_nom = requests.get(url_nominatim, headers=headers, timeout=6).json()
                 if len(res_nom) > 0:
-                    latitude = float(res_nom['lat'])
-                    longitude = float(res_nom['lon'])
+                    latitude = float(res_nom[0]['lat'])
+                    longitude = float(res_nom[0]['lon'])
             except:
                 pass
 
@@ -124,10 +124,10 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO
+        # 🧠 PREDITOR COMBINADO CORRIGIDO COM [0] CONTRA TYPEEROR
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao)
+        proporcao_ia = float(resultado_predicao[0])  # <--- SOLUÇÃO DEFINITIVA DO SCRIPT
         
         valor_m2_calculado = area_m2 * preco_m2_base
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
@@ -135,9 +135,9 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         if padrao == "Econômico / Popular": preco_final *= 0.85
         elif padrao == "Alto Padrão / Luxo": preco_final *= 1.30
         
-        # Calibração de adicionais (Suavizando o peso extra de vagas e mercado)
+        # Calibração de adicionais suavizada
         preco_final += (vagas * 15000)
-        preco_final = preco_final * 0.93  # Ajuste fino para aproximar do real transacionado
+        preco_final = preco_final * 0.93  
 
         # Exibição dos resultados na interface
         st.success(f"## Valor de Mercado Estimado: R$ {preco_final:,.2f}")
@@ -153,7 +153,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         df_mapa = pd.DataFrame({'latitude': [latitude], 'longitude': [longitude]})
         st.map(df_mapa, zoom=14)
         
-        # 🔗 LINK GOOGLE MAPS CORRIGIDO: Codifica o texto do endereço perfeitamente para abrir no app ou navegador
+        # 🔗 LINK GOOGLE MAPS CORRIGIDO: Codifica o texto do endereço perfeitamente
         endereco_codificado = urllib.parse.quote(f"{endereco_completo}, Brasil")
         url_google_maps = f"https://google.com{endereco_codificado}"
         st.markdown(f"[🔗 Clique aqui para abrir este endereço direto no app do Google Maps]({url_google_maps})")
