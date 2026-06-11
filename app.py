@@ -12,7 +12,6 @@ st.markdown("Estime o valor de mercado real de imóveis em **qualquer município
 # 2. Base de dados base para tendências de tamanho e cômodos
 @st.cache_resource
 def treinar_ia_nacional():
-    # Dataset genérico que ensina ao XGBoost o impacto proporcional de m², quartos e vagas
     texto_dados = """area_m2,quartos,vagas,preco_base_referencia
 40,1,0,160000
 50,1,1,210000
@@ -63,7 +62,7 @@ with col_esq:
     padrao = st.selectbox("Padrão de Acabamento", ["Econômico / Popular", "Médio / Padrão", "Alto Padrão / Luxo"])
 
 with col_dir:
-    st.subheader("📍 Localização (Escolha uma opção)")
+    st.subheader("📍 Localização (Travada no Brasil)")
     opcao_busca = st.radio("Como deseja localizar?", ["Por CEP ou Endereço escrito", "Por Coordenadas (Lat/Lon)"])
     
     latitude, longitude = -23.5505, -46.6333 # Padrão: SP Capital
@@ -72,21 +71,22 @@ with col_dir:
     if opcao_busca == "Por CEP ou Endereço escrito":
         endereco_digitado = st.text_input("Digite o CEP, Rua ou Cidade (Ex: Jardim Casqueiro, Cubatão SP)", "Cubatão, SP")
     else:
+        # Valores iniciais ajustados direto para a Baixada Santista para evitar o ponto zero do mapa
         latitude = st.number_input("Latitude", value=-23.8900, format="%.4f")
         longitude = st.number_input("Longitude", value=-46.4200, format="%.4f")
 
 # 4. Processamento da Localização e Cálculo do Preço
 if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
     with st.spinner("Buscando dados geográficos e aplicando índices locais..."):
-        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v3")
+        geolocator = Nominatim(user_agent="previsor_imoveis_brasil_v4")
         cidade = ""
         estado_uf = ""
         endereco_completo = ""
         
-        # Resolve a localização independente da escolha do usuário
         try:
             if opcao_busca == "Por CEP ou Endereço escrito" and endereco_digitado:
-                loc = geolocator.geocode(endereco_digitado, addressdetails=True, timeout=10)
+                # 🔒 CORREÇÃO CRÍTICA: country_codes='BR' força o mapa a buscar APENAS no Brasil
+                loc = geolocator.geocode(endereco_digitado, addressdetails=True, country_codes='BR', timeout=10)
                 if loc:
                     latitude, longitude = loc.latitude, loc.longitude
                     endereco_completo = loc.address
@@ -111,7 +111,7 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         cidade_limpa = str(cidade).lower().strip() if cidade else ""
         estado_uf = str(estado_uf).upper().strip() if estado_uf else "SP"
         
-        # Tratamento de segurança se vir o nome completo do estado por extenso
+        # Tratamento de segurança para siglas de estados brasileiros
         if len(estado_uf) > 2:
             if "paulo" in estado_uf.lower(): estado_uf = "SP"
             elif "rio" in estado_uf.lower(): estado_uf = "RJ"
@@ -123,7 +123,6 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         # 💎 DEFINE O PREÇO DO M² DO MICRO-MERCADO
         dados_uf = tabela_m2_brasil.get(estado_uf, tabela_m2_brasil["PADRAO"])
         
-        # Regras de especificidade (Cidade específica -> Capital -> Interior)
         if "cubatão" in cidade_limpa:
             preco_m2_base = dados_uf.get("cubatao", 4300)
         elif cidade_limpa and any(k in cidade_limpa for k in ["são paulo", "rio de janeiro", "curitiba", "belo horizonte", "porto alegre", "recife", "salvador", "fortaleza", "brasília"]):
@@ -131,24 +130,19 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         else:
             preco_m2_base = dados_uf.get("interior_no_geral", 3500)
 
-        # 🧠 PREDITOR COMBINADO CORRIGIDO (Extraindo o valor do Array com)
+        # 🧠 PREDITOR COMBINADO
         dados_usuario = pd.DataFrame([[area_m2, quartos, vagas]], columns=['area_m2', 'quartos', 'vagas'])
         resultado_predicao = modelo.predict(dados_usuario)
-        proporcao_ia = float(resultado_predicao[0])  # Fix do TypeError garantido
+        proporcao_ia = float(resultado_predicao)
         
-        # Preço base estruturado no m² comercial real do município atual
         valor_m2_calculado = area_m2 * preco_m2_base
-        
-        # Agrega o peso das variáveis físicas tratadas pelo modelo (70% peso do m² real da cidade, 30% comportamento da IA)
         preco_final = (valor_m2_calculado * 0.70) + (proporcao_ia * 0.30)
         
-        # Multiplicadores de padrão de acabamento
         if padrao == "Econômico / Popular":
             preco_final *= 0.85
         elif padrao == "Alto Padrão / Luxo":
             preco_final *= 1.30
 
-        # Adiciona valor de mercado por vaga de garagem comercializável
         preco_final += (vagas * 20000)
 
         # Exibição Analítica dos Resultados na Tela
@@ -160,3 +154,8 @@ if st.button("🚀 Calcular Avaliação de Mercado Nacional"):
         c3.metric(label="Coordenadas de Análise", value=f"{latitude:.4f}, {longitude:.4f}")
         
         st.info(f"📍 **Endereço Completo no Mapa:** {endereco_completo if endereco_completo else 'Busca por coordenadas locais.'}")
+        
+        # 🗺️ VISUALIZADOR DE MAPA: Mostra exatamente onde o imóvel está no Brasil
+        st.subheader("🗺️ Verificação Visual de Localização")
+        df_mapa = pd.DataFrame({'lat': [latitude], 'lon': [longitude]})
+        st.map(df_mapa)
