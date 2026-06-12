@@ -142,17 +142,16 @@ else:
                     st.session_state.endereco = f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
                     preco_m2_base = dados_regiao["capital"]
 
+                    # ⚡ RESOLUÇÃO DEFINITIVA DO TYPE/INDENTATION ERROR: Lógica em linha sem aninhamentos que quebram
                     if "11471070" in cep_limpo:
                         st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
                         st.session_state.lat = float(-24.00169)
                         st.session_state.lon = float(-46.27318)
                         preco_m2_base = dados_regiao["guaruja"]
                         st.session_state.cidade = "Guarujá"
-                    elif estado_uf == "SP":
-                        if "114" in cep_limpo[:3]:
-                            preco_m2_base = dados_regiao["guaruja"]
-                            st.session_state.cidade = "Guarujá"
-                        elif "115" in cep_limpo[:3]:
-                            preco_m2_base = dados_regiao["cubatao"]
-                            st.session_state.cidade = "Cubatão"
-                        elif "110" in cep_limpo[:3]:
+                    elif estado_uf == "SP" and "114" in cep_limpo[:3]:
+                        preco_m2_base = dados_regiao["guaruja"]
+                        st.session_state.cidade = "Guarujá"
+                    elif estado_uf == "SP" and "115" in cep_limpo[:3]:
+                        preco_m2_base = dados_regiao["cubatao"]
+                        st.session_state.cidade = "Cubatão"
