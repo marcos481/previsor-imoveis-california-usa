@@ -30,14 +30,14 @@ tabela_m2_nacional = {
     "RO": {"capital": 5200, "interior": 3400, "lat": -8.7619, "lon": -63.9039, "nome": "Rondônia"},
     "RR": {"capital": 4700, "interior": 3100, "lat": 2.8198, "lon": -60.6715, "nome": "Roraima"},
     "RS": {"capital": 6800, "interior": 4100, "lat": -30.0346, "lon": -51.2177, "nome": "Rio Grande do Sul"},
-    "SC": {"capital": 11000, "interior": 6500, "lat": -27.5954, "lon": -48.5480, "nome": "Santa Catarina"},
+    "SC": {"capital": 11000, "interior": 6500, "lat": -27.5954, "lon": -48.5480, "santa_catarina": ""},
     "SE": {"capital": 5500, "interior": 3400, "lat": -10.9111, "lon": -37.0717, "nome": "Sergipe"},
     "SP": {"capital": 10200, "interior": 5400, "guaruja": 6900, "cubatao": 4300, "santos": 8200, "lat": -23.5505, "lon": -46.6333, "nome": "São Paulo"},
     "TO": {"capital": 5300, "interior": 3400, "lat": -10.1844, "lon": -48.3336, "nome": "Tocantins"},
     "PADRAO": {"capital": 5500, "interior": 3500, "lat": -15.7938, "lon": -47.8827, "nome": "Brasil"}
 }
 
-# 3. SISTEMA DE LOGIN E CONTROLE DE ACESSO (Barra Lateral)
+# 3. SISTEMA DE LOGIN SEGURO E PERSISTENTE
 st.sidebar.title("🔐 Área Restrita")
 
 USUARIO_CORRETO = "admin"
@@ -45,19 +45,23 @@ SENHA_CORRETA = "corretor123"
 
 if "logado" not in st.session_state:
     st.session_state.logado = False
+if "calculado" not in st.session_state:
+    st.session_state.calculado = False
 
 if not st.session_state.logado:
-    st.sidebar.subheader("Faça login para continuar")
-    usuario = st.sidebar.text_input("Usuário")
-    senha = st.sidebar.text_input("Senha", type="password")
-    
-    if st.sidebar.button("Entrar"):
-        if usuario == USUARIO_CORRETO and senha == SENHA_CORRETA:
-            st.session_state.logado = True
-            st.rerun()
-        else:
-            st.sidebar.error("❌ Usuário ou Senha incorretos.")
-            
+    with st.sidebar.form(key="formulario_login"):
+        st.subheader("Faça login para continuar")
+        usuario = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
+        botao_entrar = st.form_submit_button("Entrar")
+        
+        if botao_entrar:
+            if usuario == USUARIO_CORRETO and senha == SENHA_CORRETA:
+                st.session_state.logado = True
+                st.rerun()
+            else:
+                st.error("❌ Usuário ou Senha incorretos.")
+                
     st.warning("🔒 Por favor, faça login na barra lateral para acessar o avaliador imobiliário.")
 
 else:
@@ -73,7 +77,6 @@ else:
     if "cidade" not in st.session_state: st.session_state.cidade = "Guarujá"
     if "uf" not in st.session_state: st.session_state.uf = "SP"
     if "preco_total" not in st.session_state: st.session_state.preco_total = 0.0
-    if "calculado" not in st.session_state: st.session_state.calculado = False
 
     # 5. INTERFACE PRINCIPAL DO PREVISOR
     st.title("🏠 Sistema Inteligente de Avaliação Imobiliária Nacional")
@@ -93,7 +96,7 @@ else:
         cep_digitado = st.text_input("Digite o CEP do Imóvel (Apenas números ou com hífen)", "")
         st.caption("Exemplos: '11471-070' (Guarujá), '11520-000' (Cubatão), '76801-000' (Rondônia)")
 
-    # 6. PROCESSAMENTO E REGRAS DE NEGÓCIO POR CEP
+    # 6. PROCESSAMENTO E REGRAS DE NEGÓCIO POR CEP (Desbloqueado com sucesso)
     if st.button("🚀 Calcular Avaliação do CEP"):
         if not cep_digitado:
             st.error("❌ Por favor, insira um CEP para realizar a pesquisa.")
@@ -142,7 +145,6 @@ else:
                     st.session_state.endereco = f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
                     preco_m2_base = dados_regiao["capital"]
 
-                    # ⚡ RESOLUÇÃO DEFINITIVA DO TYPE/INDENTATION ERROR: Lógica em linha sem aninhamentos que quebram
                     if "11471070" in cep_limpo:
                         st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
                         st.session_state.lat = float(-24.00169)
