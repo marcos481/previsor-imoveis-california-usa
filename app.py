@@ -25,7 +25,7 @@ tabela_m2_nacional = {
     "PE": {"capital": 7400, "interior": 3900, "lat": -8.0522, "lon": -34.9286, "nome": "Pernambuco"},
     "PI": {"capital": 5100, "interior": 3300, "lat": -5.0919, "lon": -42.8034, "nome": "Piauí"},
     "PR": {"capital": 7800, "interior": 4500, "lat": -25.4290, "lon": -49.2671, "nome": "Paraná"},
-    "RJ": {"capital": 10100, "interior": 4800, "lat": -22.9068, "relative_url": "", "lon": -43.1729, "nome": "Rio de Janeiro"},
+    "RJ": {"capital": 10100, "interior": 4800, "lat": -22.9068, "lon": -43.1729, "nome": "Rio de Janeiro"},
     "RN": {"capital": 5800, "interior": 3500, "lat": -5.7950, "lon": -35.2094, "nome": "Rio Grande do Norte"},
     "RO": {"capital": 5200, "interior": 3400, "lat": -8.7619, "lon": -63.9039, "nome": "Rondônia"},
     "RR": {"capital": 4700, "interior": 3100, "lat": 2.8198, "lon": -60.6715, "nome": "Roraima"},
