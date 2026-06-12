@@ -30,7 +30,7 @@ tabela_m2_nacional = {
     "RO": {"capital": 5200, "interior": 3400, "lat": -8.7619, "lon": -63.9039, "nome": "Rondônia"},
     "RR": {"capital": 4700, "interior": 3100, "lat": 2.8198, "lon": -60.6715, "nome": "Roraima"},
     "RS": {"capital": 6800, "interior": 4100, "lat": -30.0346, "lon": -51.2177, "nome": "Rio Grande do Sul"},
-    "SC": {"capital": 11000, "interior": 6500, "lat": -27.5954, "lon": -48.5480, "santa_catarina": ""},
+    "SC": {"capital": 11000, "interior": 6500, "lat": -27.5954, "lon": -48.5480, "nome": "Santa Catarina"},
     "SE": {"capital": 5500, "interior": 3400, "lat": -10.9111, "lon": -37.0717, "nome": "Sergipe"},
     "SP": {"capital": 10200, "interior": 5400, "guaruja": 6900, "cubatao": 4300, "santos": 8200, "lat": -23.5505, "lon": -46.6333, "nome": "São Paulo"},
     "TO": {"capital": 5300, "interior": 3400, "lat": -10.1844, "lon": -48.3336, "nome": "Tocantins"},
@@ -60,7 +60,7 @@ if not st.session_state.logado:
                 st.session_state.logado = True
                 st.rerun()
             else:
-                st.error("❌ Usuário ou Senha incorretos.")
+                st.sidebar.error("❌ Usuário ou Senha incorretos.")
                 
     st.warning("🔒 Por favor, faça login na barra lateral para acessar o avaliador imobiliário.")
 
@@ -93,11 +93,13 @@ else:
 
     with col_dir:
         st.subheader("📍 Localização Obrigatória")
-        cep_digitado = st.text_input("Digite o CEP do Imóvel (Apenas números ou com hífen)", "")
+        cep_digitado = st.text_input("Digite o CEP do Imóvel (Apenas numbers ou com hífen)", "")
         st.caption("Exemplos: '11471-070' (Guarujá), '11520-000' (Cubatão), '76801-000' (Rondônia)")
 
-    # 6. PROCESSAMENTO E REGRAS DE NEGÓCIO POR CEP (Desbloqueado com sucesso)
-    if st.button("🚀 Calcular Avaliação do CEP"):
+    # 6. PROCESSAMENTO E REGRAS DE NEGÓCIO POR CEP
+    botao_calcular = st.button("🚀 Calcular Avaliação do CEP")
+
+    if botao_calcular:
         if not cep_digitado:
             st.error("❌ Por favor, insira um CEP para realizar a pesquisa.")
         else:
