@@ -37,126 +37,126 @@ tabela_m2_nacional = {
     "PADRAO": {"capital": 5500, "interior": 3500, "lat": -15.7938, "lon": -47.8827, "nome": "Brasil"}
 }
 
-# 3. SISTEMA DE LOGIN SEGURO E PERSISTENTE
+# 3. CONTROLE DE ESTADOS PERSISTENTES (SESSION STATE)
+if "logado" not in st.session_state: st.session_state.logado = False
+if "calculado" not in st.session_state: st.session_state.calculado = False
+if "lat" not in st.session_state: st.session_state.lat = -24.00169
+if "lon" not in st.session_state: st.session_state.lon = -46.27318
+if "endereco" not in st.session_state: st.session_state.endereco = ""
+if "cidade" not in st.session_state: st.session_state.cidade = ""
+if "uf" not in st.session_state: st.session_state.uf = ""
+if "preco_total" not in st.session_state: st.session_state.preco_total = 0.0
+if "m2_aplicado" not in st.session_state: st.session_state.m2_aplicado = 0.0
+
+# Lógica simples de verificação do clique de login
+def processar_login(u, s):
+    if u == "admin" and s == "corretor123":
+        st.session_state.logado = True
+    else:
+        st.error("❌ Usuário ou Senha incorretos.")
+
+# Lógica isolada de processamento de cálculo (Callback nativo travado na memória)
+def processar_calculo(area, qto, vag, pad, cep_texto):
+    cep_limpo = ''.join(filter(str.isdigit, cep_texto)).strip()
+    if not cep_limpo or len(cep_limpo) != 8:
+        st.error("❌ Por favor, insira um CEP válido com 8 números.")
+        return
+
+    # Determinação de faixa postal
+    if cep_limpo.startswith(("0", "1")): estado_uf = "SP"
+    elif cep_limpo.startswith(("20", "21", "22", "23", "24", "25", "26", "27", "28")): estado_uf = "RJ"
+    elif cep_limpo.startswith("29"): estado_uf = "ES"
+    elif cep_limpo.startswith("3"): estado_uf = "MG"
+    elif cep_limpo.startswith(("40", "41", "42", "43", "44", "45", "46", "47", "48")): estado_uf = "BA"
+    elif cep_limpo.startswith("49"): estado_uf = "SE"
+    elif cep_limpo.startswith(("50", "51", "52", "53", "54", "55", "56")): estado_uf = "PE"
+    elif cep_limpo.startswith("57"): estado_uf = "AL"
+    elif cep_limpo.startswith("58"): estado_uf = "PB"
+    elif cep_limpo.startswith("59"): estado_uf = "RN"
+    elif cep_limpo.startswith(("60", "61", "62", "63")): estado_uf = "CE"
+    elif cep_limpo.startswith("64"): estado_uf = "PI"
+    elif cep_limpo.startswith("65"): estado_uf = "MA"
+    elif cep_limpo.startswith(("66", "67")) or (cep_limpo.startswith("68") and not cep_limpo.startswith(("689", "699", "693"))): estado_uf = "PA"
+    elif cep_limpo.startswith("689"): estado_uf = "AP"
+    elif cep_limpo.startswith("699"): estado_uf = "AC"
+    elif cep_limpo.startswith("693"): estado_uf = "RR"
+    elif cep_limpo.startswith(("690", "691", "692", "694", "695", "696", "697", "698")): estado_uf = "AM"
+    elif cep_limpo.startswith(("70", "71", "72")) or (730 <= int(cep_limpo[:3]) <= 736): estado_uf = "DF"
+    elif (737 <= int(cep_limpo[:3]) <= 762): estado_uf = "GO"
+    elif cep_limpo.startswith("77"): estado_uf = "TO"
+    elif cep_limpo.startswith(("768", "769")): estado_uf = "RO"
+    elif (780 <= int(cep_limpo[:3]) <= 788): estado_uf = "MT"
+    elif cep_limpo.startswith("79"): estado_uf = "MS"
+    elif cep_limpo.startswith("8"): estado_uf = "PR"
+    elif cep_limpo.startswith(("88", "89")): estado_uf = "SC"
+    elif cep_limpo.startswith("9"): estado_uf = "RS"
+    else: estado_uf = "PADRAO"
+
+    dados_regiao = tabela_m2_nacional.get(estado_uf, tabela_m2_nacional["PADRAO"])
+    st.session_state.lat = float(dados_regiao["lat"])
+    st.session_state.lon = float(dados_regiao["lon"])
+    st.session_state.cidade = dados_regiao["nome"]
+    st.session_state.uf = estado_uf
+    st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP" if "11471070" in cep_limpo else f"Região Geral do CEP {cep_texto}, Estado de {dados_regiao['nome']} - BR"
+    preco_m2_base = dados_regiao["capital"]
+
+    if "11471070" in cep_limpo:
+        st.session_state.lat, st.session_state.lon = float(-24.00169), float(-46.27318)
+        preco_m2_base = dados_regiao["guaruja"]
+        st.session_state.cidade = "Guarujá"
+    elif estado_uf == "SP":
+        if "114" in cep_limpo[:3]: preco_m2_base, st.session_state.cidade = dados_regiao["guaruja"], "Guarujá"
+        elif "115" in cep_limpo[:3]: preco_m2_base, st.session_state.cidade = dados_regiao["cubatao"], "Cubatão"
+        elif "110" in cep_limpo[:3]: preco_m2_base, st.session_state.cidade = dados_regiao["santos"], "Santos"
+
+    if int(cep_limpo[5:]) > 0 and estado_uf != "SP" and "11471070" not in cep_limpo:
+        preco_m2_base = dados_regiao["interior"]
+
+    valor_base_estrutura = (area * preco_m2_base) + (qto * 8000) + (vag * 12000)
+    if pad == "Econômico / Popular": valor_base_estrutura *= 0.82
+    elif pad == "Alto Padrão / Luxo": valor_base_estrutura *= 1.25
+    
+    st.session_state.preco_total = valor_base_estrutura * 0.93
+    st.session_state.m2_aplicado = st.session_state.preco_total / area
+    st.session_state.calculado = True
+
+# 4. RENDERIZAÇÃO DA BARRA LATERAL (LOGIN)
 st.sidebar.title("🔐 Área Restrita")
 
-USUARIO_CORRETO = "admin"
-SENHA_CORRETA = "corretor123"
-
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-if "calculado" not in st.session_state:
-    st.session_state.calculado = False
-
 if not st.session_state.logado:
-    with st.sidebar.form(key="formulario_login"):
-        st.subheader("Faça login para continuar")
-        usuario = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
-        botao_entrar = st.form_submit_button("Entrar")
-        
-        if botao_entrar:
-            if usuario == USUARIO_CORRETO and senha == SENHA_CORRETA:
-                st.session_state.logado = True
-                st.rerun()
-            else:
-                st.error("❌ Usuário ou Senha incorretos.")
-                
+    st.sidebar.subheader("Faça login para continuar")
+    input_user = st.sidebar.text_input("Usuário", key="user_field")
+    input_pass = st.sidebar.text_input("Senha", type="password", key="pass_field")
+    st.sidebar.button("Entrar", on_click=processar_login, args=(input_user, input_pass))
     st.warning("🔒 Por favor, faça login na barra lateral para acessar o avaliador imobiliário.")
-
 else:
     if st.sidebar.button("🚪 Sair do Sistema"):
         st.session_state.logado = False
         st.session_state.calculado = False
         st.rerun()
 
-    # 4. INICIALIZAÇÃO DE VARIÁVEIS DE SESSÃO DO AVALIADOR
-    if "lat" not in st.session_state: st.session_state.lat = -24.00169
-    if "lon" not in st.session_state: st.session_state.lon = -46.27318
-    if "endereco" not in st.session_state: st.session_state.endereco = "Aguardando cálculo..."
-    if "cidade" not in st.session_state: st.session_state.cidade = "Não Identificada"
-    if "uf" not in st.session_state: st.session_state.uf = "SP"
-    if "preco_total" not in st.session_state: st.session_state.preco_total = 0.0
-
-    # 5. INTERFACE PRINCIPAL DO PREVISOR
+# 5. CONTEÚDO PRINCIPAL (Só abre após autenticação aprovada)
+if st.session_state.logado:
     st.title("🏠 Sistema Inteligente de Avaliação Imobiliária Nacional")
-    st.markdown(f"Bem-vindo, **{USUARIO_CORRETO}**! Painel nacional desbloqueado com sucesso.")
+    st.markdown("Painel nacional desbloqueado com sucesso.")
 
-    # 🔒 BLINDAGEM CONTRA RELOADS: Tudo dentro de um Form único do Streamlit
-    with st.form(key="formulario_avaliacao"):
-        col_esq, col_dir = st.columns(2)
+    col_esq, col_dir = st.columns(2)
 
-        with col_esq:
-            st.subheader("📐 Características do Imóvel")
-            area_m2 = st.slider("Área Privativa (m²)", 30, 400, 70)
-            quartos = st.slider("Quantidade de Quartos", 1, 5, 2)
-            vagas = st.slider("Vagas de Garagem", 0, 4, 1)
-            padrao = st.selectbox("Padrão de Acabamento", ["Econômico / Popular", "Médio / Padrão", "Alto Padrão / Luxo"])
+    with col_esq:
+        st.subheader("📐 Características do Imóvel")
+        area_sel = st.slider("Área Privativa (m²)", 30, 400, 70, key="slider_area")
+        quartos_sel = st.slider("Quantidade de Quartos", 1, 5, 2, key="slider_quartos")
+        vagas_sel = st.slider("Vagas de Garagem", 0, 4, 1, key="slider_vagas")
+        padrao_sel = st.selectbox("Padrão de Acabamento", ["Econômico / Popular", "Médio / Padrão", "Alto Padrão / Luxo"], key="select_padrao")
 
-        with col_dir:
-            st.subheader("📍 Localização Obrigatória")
-            cep_digitado = st.text_input("Digite o CEP do Imóvel (Apenas números ou com hífen)", "")
-            st.caption("Exemplos: '11471-070' (Guarujá), '11520-000' (Cubatão), '76801-000' (Rondônia)")
+    with col_dir:
+        st.subheader("📍 Localização Obrigatória")
+        cep_sel = st.text_input("Digite o CEP do Imóvel (Apenas números ou com hífen)", "", key="input_cep")
+        st.caption("Exemplos: '11471-070' (Guarujá), '11520-000' (Cubatão), '76801-000' (Rondônia)")
 
-        # Botão de envio interno do formulário
-        botao_calcular = st.form_submit_button("🚀 Calcular Avaliação do CEP")
+    # Botão de cálculo configurado com acionador de memória puro (Impedindo reloads falsos)
+    st.button("🚀 Calcular Avaliação do CEP", on_click=processar_calculo, args=(area_sel, quartos_sel, vagas_sel, padrao_sel, cep_sel))
 
-    # 6. PROCESSAMENTO APÓS SUBMIT DO FORMULÁRIO (Garante o funcionamento do clique)
-    if botao_calcular:
-        if not cep_digitado:
-            st.error("❌ Por favor, insira um CEP para realizar a pesquisa.")
-        else:
-            cep_limpo = ''.join(filter(str.isdigit, cep_digitado)).strip()
-            
-            if len(cep_limpo) != 8:
-                st.error("❌ O CEP deve conter exatamente 8 números.")
-            else:
-                if cep_limpo.startswith(("0", "1")): estado_uf = "SP"
-                elif cep_limpo.startswith(("20", "21", "22", "23", "24", "25", "26", "27", "28")): estado_uf = "RJ"
-                elif cep_limpo.startswith("29"): estado_uf = "ES"
-                elif cep_limpo.startswith("3"): estado_uf = "MG"
-                elif cep_limpo.startswith(("40", "41", "42", "43", "44", "45", "46", "47", "48")): estado_uf = "BA"
-                elif cep_limpo.startswith("49"): estado_uf = "SE"
-                elif cep_limpo.startswith(("50", "51", "52", "53", "54", "55", "56")): estado_uf = "PE"
-                elif cep_limpo.startswith("57"): estado_uf = "AL"
-                elif cep_limpo.startswith("58"): estado_uf = "PB"
-                elif cep_limpo.startswith("59"): estado_uf = "RN"
-                elif cep_limpo.startswith(("60", "61", "62", "63")): estado_uf = "CE"
-                elif cep_limpo.startswith("64"): estado_uf = "PI"
-                elif cep_limpo.startswith("65"): estado_uf = "MA"
-                elif cep_limpo.startswith(("66", "67")) or (cep_limpo.startswith("68") and not cep_limpo.startswith(("689", "699", "693"))): estado_uf = "PA"
-                elif cep_limpo.startswith("689"): estado_uf = "AP"
-                elif cep_limpo.startswith("699"): estado_uf = "AC"
-                elif cep_limpo.startswith("693"): estado_uf = "RR"
-                elif cep_limpo.startswith(("690", "691", "692", "694", "695", "696", "697", "698")): estado_uf = "AM"
-                elif cep_limpo.startswith(("70", "71", "72")) or (730 <= int(cep_limpo[:3]) <= 736): estado_uf = "DF"
-                elif (737 <= int(cep_limpo[:3]) <= 762): estado_uf = "GO"
-                elif cep_limpo.startswith("77"): estado_uf = "TO"
-                elif cep_limpo.startswith(("768", "769")): estado_uf = "RO"
-                elif (780 <= int(cep_limpo[:3]) <= 788): estado_uf = "MT"
-                elif cep_limpo.startswith("79"): estado_uf = "MS"
-                elif cep_limpo.startswith("8"): estado_uf = "PR"
-                elif cep_limpo.startswith(("88", "89")): estado_uf = "SC"
-                elif cep_limpo.startswith("9"): estado_uf = "RS"
-                else: estado_uf = "PADRAO"
-
-                dados_regiao = tabela_m2_nacional.get(estado_uf, tabela_m2_nacional["PADRAO"])
-                st.session_state.lat = float(dados_regiao["lat"])
-                st.session_state.lon = float(dados_regiao["lon"])
-                st.session_state.cidade = dados_regiao["nome"]
-                st.session_state.uf = estado_uf
-                st.session_state.endereco = f"Região Geral do CEP {cep_digitado}, Estado de {dados_regiao['nome']} - BR"
-                preco_m2_base = dados_regiao["capital"]
-
-                if "11471070" in cep_limpo:
-                    st.session_state.endereco = "Avenida Santa Adelaide, 234 - Jardim Boa Esperança, Guarujá - SP"
-                    st.session_state.lat = float(-24.00169)
-                    st.session_state.lon = float(-46.27318)
-                    preco_m2_base = dados_regiao["guaruja"]
-                    st.session_state.cidade = "Guarujá"
-                elif estado_uf == "SP" and "114" in cep_limpo[:3]:
-                    preco_m2_base = dados_regiao["guaruja"]
-                    st.session_state.cidade = "Guarujá"
-                elif estado_uf == "SP" and "115" in cep_limpo[:3]:
-                    preco_m2_base = dados_regiao["cubatao"]
-                    st.session_state.cidade = "Cubatão"
+    # 6. EXIBIÇÃO CONSOLIDADA DOS RESULTADOS NA TELA
+    if st.session_state.calculado:
+        st.write("---")
